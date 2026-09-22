@@ -9,7 +9,7 @@ export function glyphWidth(key:string){
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');
   svg.style.cssText='position:absolute;visibility:hidden;width:100px;height:100px;pointer-events:none';
   path.setAttribute('d',sigils[key]?.path||sigils.flow.path);svg.append(path);document.body.append(svg);
-  try{width=Math.max(8,path.getBBox().width);}finally{svg.remove();}
+  try{const box=path.getBBox();width=Math.max(8,Math.hypot(box.width,box.height));}finally{svg.remove();}
  }
  widths.set(key,width);return width;
 }

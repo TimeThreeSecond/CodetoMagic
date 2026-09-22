@@ -1,13 +1,16 @@
 # 魔法阵导出
 所有 PNG 为 1680×1460 静态快照；SVG 包含源文件 SHA-256、视图、旋转相位、周期与结果类型元数据。动画请打开本地应用。
 
-## Dijkstra · v0.4
+## Dijkstra · v0.6
 源文件：`../examples/dijkstra.c`。从顶点 0 出发的距离是 `0, 7, 9, 20, 20, 11`。
 
 - `dijkstra-stack.svg/png`：主副环立体叠层。
 - `dijkstra-front.svg/png`：同蓝本的正视重叠。
 - `dijkstra-single.svg/png`：dijkstra 主层，包含 closest_vertex 副环。
 - `dijkstra-workbench.png`：交互界面。
+- `dijkstra-hands-workbench.png`：调用过程中时针暂停、分针与副环秒针的画面。
+
+运行圈选已替换为结果类型驱动的魔法指针：中环短时针、副环短秒针常驻，分层函数中分针在调用栈内显示。指针随静态演示进度平滑运动，调用期间等待，返回后恢复；这不是 C 程序的实际运行耗时。
 
 青色 main 主环为 3s，print_path 副环为 4s；金色 dijkstra 主环为 20s，closest_vertex 副环为 19s。中心均为路径/距离结果印，统一 12s。周期以 1× 为准。结果类别为可手动覆盖的启发式判断，不表示执行了代码。
 
