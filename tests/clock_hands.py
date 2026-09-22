@@ -24,26 +24,32 @@ with sync_playwright() as p:
     def hand(name): return page.locator(f'[data-hand-function="{name}"]')
     def angle(name): return float(hand(name).get_attribute('data-hand-angle'))
     def ring_angle(name): return page.locator(f'[data-function-ring="{name}"]').get_attribute('transform')
+    def relative_angle(name):
+        return hand(name).evaluate('''h=>{
+          const ring=h.closest('[data-ring-container]').querySelector('[data-function-ring]');
+          return +h.dataset.handAngle-parseFloat(ring.getAttribute('transform').slice(7));
+        }''')
     slider.fill(str(child))
     assert page.locator('[data-magic-hand="minute"]').count()==1
-    main_before=angle('main');minute_before=angle('dijkstra')
+    main_before=relative_angle('main');main_world_before=angle('main');minute_before=angle('dijkstra')
     main_ring_before=ring_angle('main')
     page.get_by_role('button',name='▷ 演示').click()
     page.wait_for_timeout(250)
-    assert angle('main')==main_before
+    assert abs(relative_angle('main')-main_before)<1e-7
+    assert angle('main')!=main_world_before
     assert ring_angle('main')!=main_ring_before
     assert angle('dijkstra')!=minute_before
     page.get_by_role('button',name='Ⅱ 暂停').click()
     held=angle('dijkstra');page.wait_for_timeout(150);assert angle('dijkstra')==held
     slider.fill(str(leaf))
-    held_main=angle('main');held_minute=angle('dijkstra');second=angle('closest_vertex')
+    held_main=relative_angle('main');held_minute=relative_angle('dijkstra');second=angle('closest_vertex')
     minute_ring_before=ring_angle('dijkstra')
     page.get_by_role('button',name='▷ 演示').click()
     samples=page.evaluate('''async()=>{const values=[];for(let i=0;i<10;i++){await new Promise(requestAnimationFrame);values.push(+document.querySelector('[data-hand-function="closest_vertex"]').dataset.handAngle);}return values;}''')
     assert len(set(samples))>=3, samples
     assert all(abs((b-a+180)%360-180)<30 for a,b in zip(samples,samples[1:]))
     assert angle('closest_vertex')!=second
-    assert angle('main')==held_main and angle('dijkstra')==held_minute
+    assert abs(relative_angle('main')-held_main)<1e-7 and abs(relative_angle('dijkstra')-held_minute)<1e-7
     assert ring_angle('dijkstra')!=minute_ring_before
     page.get_by_role('button',name='Ⅱ 暂停').click()
     # The exported pointer pose must match the SVG displayed in the app.
@@ -51,10 +57,11 @@ with sync_playwright() as p:
     slider.fill(str(after));assert page.locator('[data-magic-hand="minute"]').count()==0
     assert page.locator('[data-magic-hand="second"]').count()==2
     external_wait=next(e['i'] for e in events if e['name']=='print_path' and e['kind']=='wait')
-    slider.fill(str(external_wait));held_second=angle('print_path')
+    slider.fill(str(external_wait));held_second=relative_angle('print_path');second_world_before=angle('print_path')
     second_ring_before=ring_angle('print_path')
     page.get_by_role('button',name='▷ 演示').click();page.wait_for_timeout(100)
-    assert angle('print_path')==held_second
+    assert abs(relative_angle('print_path')-held_second)<1e-7
+    assert angle('print_path')!=second_world_before
     assert ring_angle('print_path')!=second_ring_before
     page.get_by_role('button',name='Ⅱ 暂停').click()
     assert page.locator('[data-node] circle[stroke]:not([stroke="none"])').count()==0

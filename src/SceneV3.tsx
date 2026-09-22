@@ -40,9 +40,9 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
    const handKind:HandKind=r.satellite?'second':r.fn.id===centerOwner?.id?'hour':'minute';
    const showHand=handKind!=='minute'||playback.stack.includes(r.fn.id);
    const waiting=playback.stack.includes(r.fn.id)&&(playback.activeFn!==r.fn.id||current?.kind==='wait');
-   // Ring spin uses scene time; the hand uses only its function's active clock.
-   // Calls therefore hold the hand's direction without stopping the ring.
-   return {...r,plane:l,layout,angle,features:featureLayout(nodes,r.radius),handKind,showHand,waiting,handAngle:localAngle+rotationAt(playback.clocks[r.fn.id]||0,r.period)};
+   // Hold the current rune in ring-local coordinates during a call; the
+   // shared ring rotation carries both the rune and its hand together.
+   return {...r,plane:l,layout,angle,features:featureLayout(nodes,r.radius),handKind,showHand,waiting,handAngle:localAngle+angle};
   });
  });
  const seal=resultSeals[resultKind];
