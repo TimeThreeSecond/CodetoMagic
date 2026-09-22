@@ -12,7 +12,7 @@ with sync_playwright() as p:
     expect(page.locator('.code-footer')).to_contain_text('已同步')
     assert page.locator('[data-magic-hand="hour"]').count()==1
     assert page.locator('[data-magic-hand="second"]').count()==2
-    assert page.locator('[data-magic-hand="minute"]').count()==0
+    assert page.locator('[data-magic-hand="minute"]').count()==1
     events=page.evaluate('''async()=>{
       const {analyzeCSource}=await import('/src/analysis.ts');const {buildTimeline}=await import('/src/playback.ts');const {samples}=await import('/src/sample.ts');
       const m=await analyzeCSource(samples['dijkstra.c']);return buildTimeline(m).events.map((e,i)=>({i,name:m.functions.find(f=>f.id===e.fnId).name,kind:e.kind}));
@@ -54,7 +54,11 @@ with sync_playwright() as p:
     page.get_by_role('button',name='Ⅱ 暂停').click()
     # The exported pointer pose must match the SVG displayed in the app.
     page.screenshot(path=str(base/'outputs/dijkstra-hands-workbench.png'),full_page=True)
-    slider.fill(str(after));assert page.locator('[data-magic-hand="minute"]').count()==0
+    slider.fill(str(after));assert page.locator('[data-magic-hand="minute"]').count()==1
+    returned_minute=relative_angle('dijkstra')
+    page.get_by_role('button',name='▷ 演示').click();page.wait_for_timeout(150)
+    assert abs(relative_angle('dijkstra')-returned_minute)<1e-7
+    page.get_by_role('button',name='Ⅱ 暂停').click()
     assert page.locator('[data-magic-hand="second"]').count()==2
     external_wait=next(e['i'] for e in events if e['name']=='print_path' and e['kind']=='wait')
     slider.fill(str(external_wait));held_second=relative_angle('print_path');second_world_before=angle('print_path')
@@ -76,4 +80,4 @@ with sync_playwright() as p:
     assert times[1]>times[0]*2
     assert not errors,errors
     browser.close()
-print('PASS: resident hour/second hands, scoped minute, call suspension, smooth frame motion, pause, speed, result profiles, no progress circles.')
+print('PASS: all three hands resident, return position retained, call suspension, smooth frame motion, pause, speed, result profiles, no progress circles.')

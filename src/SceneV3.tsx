@@ -38,11 +38,10 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
    const held=angles.get(playback.positions[r.fn.id])??-90;
    const localAngle=current&&current.kind==='move'?handAngle(angles.get(current.fromId||'')??-90,angles.get(current.nodeId)??held,playback.progress):held;
    const handKind:HandKind=r.satellite?'second':r.fn.id===centerOwner?.id?'hour':'minute';
-   const showHand=handKind!=='minute'||playback.stack.includes(r.fn.id);
    const waiting=playback.stack.includes(r.fn.id)&&(playback.activeFn!==r.fn.id||current?.kind==='wait');
    // Hold the current rune in ring-local coordinates during a call; the
    // shared ring rotation carries both the rune and its hand together.
-   return {...r,plane:l,layout,angle,features:featureLayout(nodes,r.radius),handKind,showHand,waiting,handAngle:localAngle+angle};
+   return {...r,plane:l,layout,angle,features:featureLayout(nodes,r.radius),handKind,waiting,handAngle:localAngle+angle};
   });
  });
  const seal=resultSeals[resultKind];
@@ -71,7 +70,7 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
   {!r.satellite&&<g data-feature-field={r.fn.name} transform={`rotate(${r.angle})`}>{r.features.map(f=><g key={f.node.id} data-feature-node={f.node.id} transform={`translate(${f.x} ${f.y})`} onClick={()=>onSelect(f.node)} onMouseEnter={()=>onHover(f.node)} onMouseLeave={()=>onHover(null)} style={{cursor:'pointer'}}><title>{f.node.label} · 第 {f.node.range.line} 行</title><Medallion node={f.node} size={f.size}/></g>)}</g>}
   {!r.satellite&&<text x="0" y={-(r.radius+38)} textAnchor="middle" stroke="none" fill={l.color} fontFamily="monospace" fontSize="11">{r.fn.name==='main'?'中环':r.fn.name}</text>}
   {r.satellite&&<g data-satellite-result={r.resultType} data-inner-period={CORE_PERIOD} transform={`rotate(${rotationAt(time,CORE_PERIOD)})`}><ResultCrest kind={r.resultType} radius={r.radius*.58}/></g>}
-  {r.showHand&&<MagicHand kind={r.handKind} result={r.resultType} radius={r.radius} coreRadius={r.satellite?r.radius*.58:Math.min(85,Math.min(...l.functions.map(f=>radii.get(f.id)!))*.22)} length={r.radius*(r.handKind==='minute'?.72:r.handKind==='hour'?.46:.55)} angle={r.handAngle} fnName={r.fn.name} waiting={r.waiting}/>}
+  <MagicHand kind={r.handKind} result={r.resultType} radius={r.radius} coreRadius={r.satellite?r.radius*.58:Math.min(85,Math.min(...l.functions.map(f=>radii.get(f.id)!))*.22)} length={r.radius*(r.handKind==='minute'?.72:r.handKind==='hour'?.46:.55)} angle={r.handAngle} fnName={r.fn.name} waiting={r.waiting}/>
  </g>)}
  {l.functions.some(f=>f.id===centerOwner?.id)&&<g data-result-core={resultKind} data-inner-period={CORE_PERIOD} transform={`rotate(${rotationAt(time,CORE_PERIOD)})`} opacity=".9" strokeWidth="1"><ResultCrest kind={resultKind} radius={Math.min(85,Math.min(...l.functions.map(f=>radii.get(f.id)!))*.22)}/><title>统一结果印：{seal.label} · {CORE_PERIOD}s</title></g>}
  </g>)}
