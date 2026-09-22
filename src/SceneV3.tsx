@@ -31,7 +31,7 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
   });
   return [...main,...sub].map(r=>{
    const nodes=visibleNodes(r.fn,expanded,Math.max(8,Math.floor(220/model.functions.length)));
-   const layout=tokenLayout(nodes,r.radius),angle=rotationAt(playback.clocks[r.fn.id]||0,r.period);
+   const layout=tokenLayout(nodes,r.radius),angle=rotationAt(time,r.period);
    layout.forEach(({node,angle:a})=>{const p=polar(a+angle,r.radius),pos={x:r.cx+p.x,y:l.y+(r.cy+p.y)*l.scaleY};positions.set(node.id,pos);node.members?.forEach(m=>positions.set(m.id,pos));});
    const angles=new Map<string,number>();layout.forEach(p=>{angles.set(p.node.id,p.angle);p.node.members?.forEach(n=>angles.set(n.id,p.angle));});
    const current=playback.event?.fnId===r.fn.id?playback.event:null;
@@ -40,7 +40,9 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
    const handKind:HandKind=r.satellite?'second':r.fn.id===centerOwner?.id?'hour':'minute';
    const showHand=handKind!=='minute'||playback.stack.includes(r.fn.id);
    const waiting=playback.stack.includes(r.fn.id)&&(playback.activeFn!==r.fn.id||current?.kind==='wait');
-   return {...r,plane:l,layout,angle,features:featureLayout(nodes,r.radius),handKind,showHand,waiting,handAngle:localAngle+angle};
+   // Ring spin uses scene time; the hand uses only its function's active clock.
+   // Calls therefore hold the hand's direction without stopping the ring.
+   return {...r,plane:l,layout,angle,features:featureLayout(nodes,r.radius),handKind,showHand,waiting,handAngle:localAngle+rotationAt(playback.clocks[r.fn.id]||0,r.period)};
   });
  });
  const seal=resultSeals[resultKind];
