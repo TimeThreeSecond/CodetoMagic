@@ -8,13 +8,20 @@ const profiles:Record<ResultKind,string>={
  decision:'M-8 0 H76 M15 0 L26 -6 L37 0 L26 6 Z M46 0 L57 -6 L68 0 L57 6 Z M68 -3 L76 0 L68 3',
  unknown:'M-8 0 H76 M17 0 L24 -4 L31 0 L24 4 Z M43 0 L50 -4 L57 0 L50 4 Z M66 -4 L76 0 L66 4'
 };
-export function MagicHand({kind,result,length,angle,fnName,waiting}:{kind:HandKind;result:ResultKind;length:number;angle:number;fnName:string;waiting:boolean}){
+export function MagicHand({kind,result,length,radius,coreRadius,angle,fnName,waiting}:{kind:HandKind;result:ResultKind;length:number;radius:number;coreRadius:number;angle:number;fnName:string;waiting:boolean}){
  const width=kind==='hour'?1.9:kind==='minute'?1.3:.9;
+ // The crest's decorative tips extend to 47/40 of its nominal radius.
+ // Reserve that full envelope, then fit the entire hand (-8..76) outward.
+ const start=coreRadius*1.2+Math.min(8,radius*.05);
+ const scale=Math.min(length/76,Math.max(0,radius*.96-start)/84);
+ const offset=start+8*scale;
  return <g data-magic-hand={kind} data-hand-result={result} data-hand-function={fnName} data-hand-angle={angle} data-hand-waiting={waiting} transform={`rotate(${angle})`} pointerEvents="none" fill="none" strokeLinecap="round" strokeLinejoin="round">
   <title>{kind==='hour'?'短时针':kind==='minute'?'中分针':'短秒针'} · {fnName}{waiting?' · 等待调用返回':''}</title>
-  <path d={profiles[result]} transform={`scale(${length/76})`} strokeWidth={width} vectorEffect="non-scaling-stroke"/>
+  <g data-hand-start={start} data-hand-tip={offset+76*scale} transform={`translate(${offset} 0) scale(${scale})`}>
+  <path d={profiles[result]} strokeWidth={width} vectorEffect="non-scaling-stroke"/>
   {kind==='hour'&&<path d="M-6 -3 L0 -7 L6 -3 L6 3 L0 7 L-6 3 Z" strokeWidth="1.2"/>}
   {kind==='minute'&&<path d="M-4 -4 H4 V4 H-4 Z" strokeWidth="1"/>}
   {kind==='second'&&<path d="M-5 0 L0 -4 L5 0 L0 4 Z" strokeWidth=".8"/>}
+  </g>
  </g>;
 }
