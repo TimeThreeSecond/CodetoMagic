@@ -1,11 +1,29 @@
 import {describe,it,expect} from 'vitest';
 import {motionTransform,type Motion} from './svgPlayback';
-import {ringDirection} from './rotation';
+import {functionDirection,functionFeatures,resultDirection} from './rotation';
+import type {Fn} from './analysis';
 import {handAngle} from './playback';
 describe('portable motion and direction rules',()=>{
- it('alternates main rings and reverses their satellites',()=>{
-  expect([0,1,2,3].map(i=>ringDirection(i))).toEqual([1,-1,1,-1]);
-  for(let i=0;i<4;i++)expect(ringDirection(i,true)).toBe(-ringDirection(i));
+ const range={start:0,end:1,line:1,endLine:1};
+ const fn:Fn={id:'f0',name:'main',range,order:0,reachable:true,returnType:'int',nodes:[{id:'n',kind:'return_statement',label:'return',range,depth:0,family:'general',pointers:0,sigils:['return','+']}]};
+ it('keeps directions independent of names, source locations and layout order',()=>{
+  const renamed={...fn,id:'f99',name:'helper',order:99,reachable:false,range:{...range,line:100},nodes:fn.nodes.map(n=>({...n,id:'other',label:'different',range:{...range,start:900}}))};
+  expect(functionFeatures(renamed)).toBe(functionFeatures(fn));
+  expect(functionDirection(renamed)).toBe(functionDirection(fn));
+  expect(functionDirection(renamed,'orbit')).toBe(functionDirection(fn,'orbit'));
+ });
+ it('permits all spin/orbit combinations and same-direction independent functions',()=>{
+  const combinations=new Set<string>();
+  const directions:number[]=[];
+  for(let depth=0;depth<64;depth++){
+   const variant={...fn,nodes:fn.nodes.map(n=>({...n,depth}))};
+   combinations.add(`${functionDirection(variant)},${functionDirection(variant,'orbit')}`);
+   directions.push(functionDirection(variant));
+  }
+  expect(combinations.size).toBe(4);
+  expect(directions.filter(d=>d===1).length).toBeGreaterThan(1);
+  expect(directions.filter(d=>d===-1).length).toBeGreaterThan(1);
+  expect(resultDirection('path')).toBe(resultDirection('path'));
  });
  it('travels counterclockwise across zero without reversing or teleporting',()=>{
   expect(handAngle(10,350,.5,-1)).toBe(0);
