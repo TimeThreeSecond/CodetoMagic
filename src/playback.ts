@@ -35,8 +35,8 @@ export function samplePlayback(timeline:Timeline,time:number){
  const event=events[lo],progress=Math.max(0,Math.min(1,(time-event.start)/event.duration));
  return {event,step:lo,progress,activeFn:event.fnId,stack:event.stack,positions:event.positions,clocks:{...event.clocks,[event.fnId]:(event.clocks[event.fnId]||0)+(event.kind==='move'?progress*event.duration:0)},ended:false};
 }
-export function handAngle(from:number,to:number,progress:number){
- const turn=((to-from)%360+360)%360;
+export function handAngle(from:number,to:number,progress:number,direction=1){
+ const turn=direction*((direction*(to-from)%360+360)%360);
  const t=Math.max(0,Math.min(1,progress));const eased=t*t*(3-2*t);
  return from+turn*eased;
 }

@@ -7,11 +7,16 @@ import {sigils} from './sigils';
 import {Editor} from './Editor';
 import {samples} from './sample';
 import {buildTimeline,samplePlayback} from './playback';
+import {recordSvg,readRecording} from './svgPlayback';
+import {SvgPlayer} from './SvgPlayer';
 import './style.css';
 function App(){
  const [source,setSource]=useState(samples['dijkstra.c']),[filename,setFilename]=useState('dijkstra.c');
  const [mode,setMode]=useState<ViewMode>('stack'),[hidden,setHidden]=useState<string[]>([]),[solo,setSolo]=useState<string|null>(null),[spacing,setSpacing]=useState(160),[orbit,setOrbit]=useState(18);
  const [resultChoice,setResultChoice]=useState<ResultKind|'auto'>('auto');
+ const [recording,setRecording]=useState<{value:ReturnType<typeof readRecording>;name:string}|null>(null);
+ const recordingInput=useRef<HTMLInputElement>(null);
+ async function loadSvg(file:File){try{if(file.size>20_000_000)throw new Error('SVG 超过 20 MB');const value=readRecording(await file.text());setPlaying(false);setRecording({value,name:file.name});setError('');}catch(e){setError(`SVG 导入失败：${e instanceof Error?e.message:String(e)}`);}}
  useEffect(()=>{setHidden([]);setSolo(null);setResultChoice('auto');},[source]);
  const [model,setModel]=useState<Model|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(true);
  const [selected,setSelected]=useState<Node|null>(null),[hover,setHover]=useState<Node|null>(null),[expanded,setExpanded]=useState<string|null>(null);
@@ -23,16 +28,18 @@ function App(){
  const seek=(index:number)=>{setPlaying(false);setTime(timeline.events[index]?.start||0);};
  useEffect(()=>{if(!playing)return;let frame=0,last=0;const loop=(now:number)=>{if(last)setTime(t=>Math.min(timeline.duration,t+Math.min(.08,(now-last)/1000)*speed));last=now;frame=requestAnimationFrame(loop);};frame=requestAnimationFrame(loop);return()=>cancelAnimationFrame(frame);},[playing,speed,timeline]);
  useEffect(()=>{if(playing&&time>=timeline.duration)setPlaying(false);},[time,playing,timeline.duration]);
- async function loadFile(file:File){if(!file.name.toLowerCase().endsWith('.c')){setError('请选择 .c 文件。');return;}if(file.size>2_000_000){setError('文件超过 2 MB，请选择较小的 C 文件。');return;}try{const s=new TextDecoder('utf-8',{fatal:true}).decode(await file.arrayBuffer());setFilename(file.name);setSource(s);}catch{setError('无法按 UTF-8 读取文件，请先将文件保存为 UTF-8。');}}
+ async function loadFile(file:File){if(file.name.toLowerCase().endsWith('.svg')){await loadSvg(file);return;}if(!file.name.toLowerCase().endsWith('.c')){setError('请选择 .c 或可重播 .svg 文件。');return;}if(file.size>2_000_000){setError('文件超过 2 MB，请选择较小的 C 文件。');return;}try{const s=new TextDecoder('utf-8',{fatal:true}).decode(await file.arrayBuffer());setFilename(file.name);setSource(s);}catch{setError('无法按 UTF-8 读取文件，请先将文件保存为 UTF-8。');}}
  function download(blob:Blob,ext:string){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename.replace(/\.c$/i,'')+'-sigil.'+ext;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
- async function exportImage(png:boolean){try{if(!svgRef.current)return;const clone=svgRef.current.cloneNode(true) as SVGSVGElement;clone.setAttribute('width','1680');clone.setAttribute('height','1460');clone.removeAttribute('style');clone.setAttribute('aria-label',`Code to Magic ${model?.sourceHash}`);const blob=new Blob([new XMLSerializer().serializeToString(clone)],{type:'image/svg+xml;charset=utf-8'});if(!png){download(blob,'svg');return;}const url=URL.createObjectURL(blob);try{const img=new Image();img.src=url;await img.decode();const c=document.createElement('canvas');c.width=1680;c.height=1460;c.getContext('2d')!.drawImage(img,0,0);const out=await new Promise<Blob|null>(resolve=>c.toBlob(resolve,'image/png'));if(out)download(out,'png');}finally{URL.revokeObjectURL(url);}}catch(e){setError(`导出失败：${String(e)}`);}}
+ async function exportImage(png:boolean){try{if(!svgRef.current)return;const clone=png?svgRef.current.cloneNode(true) as SVGSVGElement:recordSvg(svgRef.current,timeline,time);clone.setAttribute('width','1680');clone.setAttribute('height','1460');clone.removeAttribute('style');clone.setAttribute('aria-label',`Code to Magic ${model?.sourceHash}`);const blob=new Blob([new XMLSerializer().serializeToString(clone)],{type:'image/svg+xml;charset=utf-8'});if(!png){download(blob,'svg');return;}const url=URL.createObjectURL(blob);try{const img=new Image();img.src=url;await img.decode();const c=document.createElement('canvas');c.width=1680;c.height=1460;c.getContext('2d')!.drawImage(img,0,0);const out=await new Promise<Blob|null>(resolve=>c.toBlob(resolve,'image/png'));if(out)download(out,'png');}finally{URL.revokeObjectURL(url);}}catch(e){setError(`导出失败：${String(e)}`);}}
  const planes=model?buildPlanes(model):[];
  const radiusReport=mainRadii(planes);
  const resultKind=resultChoice==='auto'?(model?inferResultKind(model):'unknown'):resultChoice;
  const info=hover||selected; const active=model?.functions.flatMap(f=>f.nodes).find(n=>n.id===playback.event?.nodeId);
+ if(recording)return <div className="app"><main><SvgPlayer recording={recording.value} name={recording.name} onClose={()=>setRecording(null)}/></main></div>;
  return <div className="app" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)void loadFile(f);}}>
-  <header><a className="brand" href="#"><span className="brand-seal">✳</span><span>CODE TO MAGIC<small>代码炼成术 / LOCAL ATELIER</small></span></a><div className="header-right"><span className="local"><i/> 本地解析 · 文件不会上传</span><span className="edition">EXPERIMENT 001</span></div></header>
+  <header><a className="brand" href="#"><span className="brand-seal">✳</span><span>CODE TO MAGIC<small>代码炼成术 / LOCAL ATELIER</small></span></a><div className="header-right"><button onClick={()=>recordingInput.current?.click()}>导入 SVG 动画 ↗</button><input ref={recordingInput} type="file" accept=".svg" aria-label="导入 SVG 动画文件" hidden onChange={e=>{const file=e.target.files?.[0];if(file)void loadSvg(file);e.target.value='';}}/><span className="local"><i/> 本地解析 · 文件不会上传</span><span className="edition">EXPERIMENT 001</span></div></header>
   <main><section className="intro"><div><div className="eyebrow">THE ANATOMY OF A SPELL</div><h1>让逻辑，显现为魔法。</h1><p>每一个函数是一重法环，每一道分支是一枚符文。</p></div><div className="intro-note">C SOURCE → ARCANE GEOMETRY<br/><span>结构赋予形态，指纹留下印记。</span></div></section>
+  <p className="motion-note">主环由内向外交替顺逆转；副环反向自转、同向公转；结果印统一逆转。SVG 可导出后重新导入动态播放。</p>
   <div className="workspace"><section className="code-panel"><div className="panel-title"><span><b>01</b> 源典 SOURCE</span><button onClick={()=>fileRef.current?.click()}>导入 .c ↗</button><input ref={fileRef} type="file" accept=".c" hidden onChange={e=>{const f=e.target.files?.[0];if(f)void loadFile(f);e.target.value='';}}/></div><div className="filebar"><span>◇ {filename}</span><select aria-label="示例代码" value={samples[filename]===source?filename:''} onChange={e=>{if(e.target.value){setFilename(e.target.value);setSource(samples[e.target.value]);}}}><option value="" disabled>选择示例</option>{Object.keys(samples).map(k=><option key={k}>{k}</option>)}</select></div>
   <Editor source={source} onChange={setSource} selection={selected?.range||null} onPosition={p=>{const ns=model?.functions.flatMap(f=>f.nodes).filter(n=>n.range.start<=p&&n.range.end>=p).sort((a,b)=>(a.range.end-a.range.start)-(b.range.end-b.range.start));setSelected(ns?.[0]||null);}}/>
   <div className="code-footer"><span>{source.split('\n').length} LINES</span><span>UTF-8 / C</span><span>{busy?'解析中…':model?.diagnostics.length?`${model.diagnostics.length} 处待检查`:'● 已同步'}</span></div></section>

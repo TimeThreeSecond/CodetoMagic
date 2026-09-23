@@ -7,11 +7,13 @@ import {RingFrame} from './RingFrame';
 import {compactRadius} from './compactLayout';
 import {samplePlayback,handAngle,type Timeline} from './playback';
 import {MagicHand,type HandKind} from './MagicHand';
+import {ringDirection,spin,directionName} from './rotation';
 type Props={model:Model;timeline:Timeline;time:number;step:number;selected:string|null;onSelect:(n:Node)=>void;onHover:(n:Node|null)=>void;expanded:string|null;setExpanded:(id:string|null)=>void;tilt:number;zoom:number;glow:boolean;svgRef:React.RefObject<SVGSVGElement|null>;mode:ViewMode;hidden:string[];solo:string|null;spacing:number;resultKind:ResultKind;orbit:number};
 const polar=(angle:number,radius:number)=>({x:Math.cos(angle*Math.PI/180)*radius,y:Math.sin(angle*Math.PI/180)*radius});
 export function Scene({model,timeline,time,step,selected,onSelect,onHover,expanded,setExpanded,tilt,zoom,glow,svgRef,mode,hidden,solo,spacing,resultKind,orbit}:Props){
  const all=buildPlanes(model),radii=mainRadii(all),playback=samplePlayback(timeline,time),active=playback.event?.nodeId;
  const safeSpacing=spacing;
+ const rank=(id:string)=>Array.from(radii.keys()).indexOf(id);
  const centerOwner=model.functions.find(f=>f.name==='main')||all[0]?.functions[0];
  const kindFor=(fn:typeof model.functions[number])=>fn.id===centerOwner?.id?resultKind:inferFunctionResultKind(fn);
  const projections=all.map((plane,index)=>({...plane,index,...layerProjection(index,all.length,mode,tilt,safeSpacing)}));
@@ -26,22 +28,27 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
    const ownerRadius=radii.get(s.ownerId)!,siblings=l.satellites.filter(c=>c.ownerId===s.ownerId),i=siblings.indexOf(s);
    const radius=Math.min(96,preferredRadius(s.fn)*.55,ownerRadius*.24,ownerRadius*.5*Math.sin(Math.PI/Math.max(2,siblings.length))*.8);
    const orbitPeriod=orbitalPeriod(orbit,l.index+index);
-   const center=polar(25+l.index*137.508+i*360/siblings.length+rotationAt(time,orbitPeriod),ownerRadius*.48);
-   return {fn:s.fn,radius,cx:center.x,cy:center.y,period:radialPeriod(l.period,index+1),satellite:true,ownerId:s.ownerId,orbitPeriod,resultType:inferFunctionResultKind(s.fn)};
+   const orbitPhase=25+l.index*137.508+i*360/siblings.length;
+   const orbitRadius=ownerRadius*.48;
+   const orbitRate=360/orbitPeriod*ringDirection(rank(s.ownerId));
+   const center=polar(orbitPhase+time*orbitRate,orbitRadius);
+   return {fn:s.fn,radius,cx:center.x,cy:center.y,period:radialPeriod(l.period,index+1),satellite:true,ownerId:s.ownerId,orbitPeriod,orbitMotion:JSON.stringify({kind:'orbit',phase:orbitPhase,radius:orbitRadius,rate:orbitRate}),resultType:inferFunctionResultKind(s.fn)};
   });
   return [...main,...sub].map(r=>{
    const nodes=visibleNodes(r.fn,expanded,Math.max(8,Math.floor(220/model.functions.length)));
-   const layout=tokenLayout(nodes,r.radius),angle=rotationAt(time,r.period);
+   const direction=ringDirection(rank(r.ownerId),r.satellite);
+   const orient=(a:number)=>direction===1?a:-180-a;
+   const layout=tokenLayout(nodes,r.radius).map(p=>({...p,angle:orient(p.angle),tokens:p.tokens.map(t=>({...t,angle:orient(t.angle)}))})),angle=spin(time,r.period,direction);
    layout.forEach(({node,angle:a})=>{const p=polar(a+angle,r.radius),pos={x:r.cx+p.x,y:l.y+(r.cy+p.y)*l.scaleY};positions.set(node.id,pos);node.members?.forEach(m=>positions.set(m.id,pos));});
    const angles=new Map<string,number>();layout.forEach(p=>{angles.set(p.node.id,p.angle);p.node.members?.forEach(n=>angles.set(n.id,p.angle));});
    const current=playback.event?.fnId===r.fn.id?playback.event:null;
    const held=angles.get(playback.positions[r.fn.id])??-90;
-   const localAngle=current&&current.kind==='move'?handAngle(angles.get(current.fromId||'')??-90,angles.get(current.nodeId)??held,playback.progress):held;
+   const localAngle=current&&current.kind==='move'?handAngle(angles.get(current.fromId||'')??-90,angles.get(current.nodeId)??held,playback.progress,direction):held;
    const handKind:HandKind=r.satellite?'second':r.fn.id===centerOwner?.id?'hour':'minute';
    const waiting=playback.stack.includes(r.fn.id)&&(playback.activeFn!==r.fn.id||current?.kind==='wait');
    // Hold the current rune in ring-local coordinates during a call; the
    // shared ring rotation carries both the rune and its hand together.
-   return {...r,plane:l,layout,angle,features:featureLayout(nodes,r.radius),handKind,waiting,handAngle:localAngle+angle};
+   return {...r,plane:l,layout,angle,direction,angles:Object.fromEntries(angles),rotationMotion:JSON.stringify({kind:'rotate',rate:360/r.period*direction}),features:featureLayout(nodes,r.radius),handKind,waiting,handAngle:localAngle+angle};
   });
  });
  const seal=resultSeals[resultKind];
@@ -51,10 +58,11 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
  <rect x={-boundX} y={-boundY} width={boundX*2} height={boundY*2} fill="#091313"/>
  <g transform={`scale(${zoom})`}>
  {layers.map(l=><g key={l.id} data-layer={l.id} data-color={l.color} data-period={l.period} data-plane-transform={`translate(0 ${l.y}) scale(1 ${l.scaleY})`} transform={`translate(0 ${l.y}) scale(1 ${l.scaleY})`} stroke={l.color} fill="none" strokeLinecap="round" strokeLinejoin="round">
- {rings.filter(r=>r.plane.id===l.id).map(r=><g key={r.fn.id} transform={`translate(${r.cx} ${r.cy})`} data-ring-container={r.fn.name} data-owner={r.ownerId} data-satellite={r.satellite} data-orbit-period={r.orbitPeriod||undefined}>
+ {rings.filter(r=>r.plane.id===l.id).map(r=><g key={r.fn.id} transform={`translate(${r.cx} ${r.cy})`} data-ring-container={r.fn.name} data-owner={r.ownerId} data-function-id={r.fn.id} data-direction={r.direction} data-node-angles={JSON.stringify(r.angles)} data-motion={'orbitMotion' in r?r.orbitMotion:undefined} data-satellite={r.satellite} data-orbit-period={r.orbitPeriod||undefined}>
   <title>{r.fn.name} · {r.satellite?`副环结果：${resultSeals[r.resultType].label}（启发式） · 公转 ${r.orbitPeriod}s`:`主环 · ${r.period}s`}</title>
   {r.satellite&&<circle r={r.radius+18} fill="#091313" fillOpacity=".92" stroke="none"/>}
-  <g data-function-ring={r.fn.name} data-radius={r.radius} data-period={r.period} transform={`rotate(${r.angle})`} opacity={r.fn.reachable?1:.55}>
+  <g data-function-ring={r.fn.name} data-radius={r.radius} data-period={r.period} data-motion={r.rotationMotion} data-direction={r.direction} transform={`rotate(${r.angle})`} opacity={r.fn.reachable?1:.55}>
+   <title>{directionName(r.direction)} · {r.period}s</title>
    <g filter={glow?'url(#glow)':undefined}><RingFrame kind={r.resultType} radius={r.radius} small={r.satellite} hash={model.sourceHash}/></g>
    {r.layout.map(({node:n,angle,tokens,pitch})=>{
     const p=polar(angle,r.radius),lit=n.id===active||n.members?.some(m=>m.id===active),focus=n.id===selected||n.members?.some(m=>m.id===selected);
@@ -67,12 +75,12 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
     </g>;
    })}
   </g>
-  {!r.satellite&&<g data-feature-field={r.fn.name} transform={`rotate(${r.angle})`}>{r.features.map(f=><g key={f.node.id} data-feature-node={f.node.id} transform={`translate(${f.x} ${f.y})`} onClick={()=>onSelect(f.node)} onMouseEnter={()=>onHover(f.node)} onMouseLeave={()=>onHover(null)} style={{cursor:'pointer'}}><title>{f.node.label} · 第 {f.node.range.line} 行</title><Medallion node={f.node} size={f.size}/></g>)}</g>}
+  {!r.satellite&&<g data-feature-field={r.fn.name} data-motion={r.rotationMotion} transform={`rotate(${r.angle})`}>{r.features.map(f=><g key={f.node.id} data-feature-node={f.node.id} transform={`translate(${f.x} ${f.y})`} onClick={()=>onSelect(f.node)} onMouseEnter={()=>onHover(f.node)} onMouseLeave={()=>onHover(null)} style={{cursor:'pointer'}}><title>{f.node.label} · 第 {f.node.range.line} 行</title><Medallion node={f.node} size={f.size}/></g>)}</g>}
   {!r.satellite&&<text x="0" y={-(r.radius+38)} textAnchor="middle" stroke="none" fill={l.color} fontFamily="monospace" fontSize="11">{r.fn.name==='main'?'中环':r.fn.name}</text>}
-  {r.satellite&&<g data-satellite-result={r.resultType} data-inner-period={CORE_PERIOD} transform={`rotate(${rotationAt(time,CORE_PERIOD)})`}><ResultCrest kind={r.resultType} radius={r.radius*.58}/></g>}
+  {r.satellite&&<g data-satellite-result={r.resultType} data-inner-period={CORE_PERIOD} data-motion={JSON.stringify({kind:'rotate',rate:-360/CORE_PERIOD})} transform={`rotate(${-rotationAt(time,CORE_PERIOD)})`}><ResultCrest kind={r.resultType} radius={r.radius*.58}/></g>}
   <MagicHand kind={r.handKind} result={r.resultType} radius={r.radius} coreRadius={r.satellite?r.radius*.58:Math.min(85,Math.min(...l.functions.map(f=>radii.get(f.id)!))*.22)} length={r.radius*(r.handKind==='minute'?.72:r.handKind==='hour'?.46:.55)} angle={r.handAngle} fnName={r.fn.name} waiting={r.waiting}/>
  </g>)}
- {l.functions.some(f=>f.id===centerOwner?.id)&&<g data-result-core={resultKind} data-inner-period={CORE_PERIOD} transform={`rotate(${rotationAt(time,CORE_PERIOD)})`} opacity=".9" strokeWidth="1"><ResultCrest kind={resultKind} radius={Math.min(85,Math.min(...l.functions.map(f=>radii.get(f.id)!))*.22)}/><title>统一结果印：{seal.label} · {CORE_PERIOD}s</title></g>}
+ {l.functions.some(f=>f.id===centerOwner?.id)&&<g data-result-core={resultKind} data-inner-period={CORE_PERIOD} data-motion={JSON.stringify({kind:'rotate',rate:-360/CORE_PERIOD})} transform={`rotate(${-rotationAt(time,CORE_PERIOD)})`} opacity=".9" strokeWidth="1"><ResultCrest kind={resultKind} radius={Math.min(85,Math.min(...l.functions.map(f=>radii.get(f.id)!))*.22)}/><title>统一结果印：{seal.label} · {CORE_PERIOD}s · 逆时针</title></g>}
  </g>)}
  <g fill="none" strokeWidth=".8" opacity=".45" pointerEvents="none">{rings.flatMap(r=>r.fn.nodes.map(n=>{const target=model.functions.find(f=>f.name===n.target),a=positions.get(n.id),b=target?.nodes[0]?positions.get(target.nodes[0].id):null;if(!a||!b||(target!==r.fn&&n.id!==selected))return null;return <path key={n.id} data-call-edge="true" stroke={r.plane.color} strokeDasharray="3 5" d={target===r.fn?`M${a.x} ${a.y} c70 -90 -70 -90 0 0`:`M${a.x} ${a.y} Q0 ${Math.min(a.y,b.y)-30} ${b.x} ${b.y}`}/>;}))}</g>
  {!layers.length&&<text textAnchor="middle" fill="#a3b9a6" fontSize="14">所有图层已隐藏，请在图层面板中开启。</text>}
