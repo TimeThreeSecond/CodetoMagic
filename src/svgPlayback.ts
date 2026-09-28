@@ -72,13 +72,13 @@ function validateMotion(value:unknown):Motion {
 // Rebuild a restricted SVG tree. Never inject untrusted SVG HTML or run its scripts.
 const elements=new Set('svg g path circle ellipse rect line polyline polygon text title desc metadata defs filter feGaussianBlur feMerge feMergeNode'.split(' '));
 const attributes=new Set('id viewBox width height x y x1 x2 y1 y2 cx cy r rx ry d points transform fill fill-opacity stroke stroke-width stroke-opacity stroke-linecap stroke-linejoin stroke-dasharray opacity font-family font-size text-anchor pointer-events vector-effect filter stdDeviation result in'.split(' '));
-export function readRecording(text:string){
+export function readRecording(text:string,allowStatic=false){
  if(text.length>20_000_000)throw new Error('SVG 超过 20 MB');
  const doc=new DOMParser().parseFromString(text,'image/svg+xml');
  if(doc.querySelector('parsererror')||doc.documentElement.localName!=='svg'||doc.documentElement.namespaceURI!==NS)throw new Error('不是有效的 SVG 文件');
  const raw=doc.querySelector('metadata[id="magic-playback"]')?.textContent;
- if(!raw)throw new Error('这个 SVG 没有播放轨迹。旧版静态 SVG 需要从 C / Python 源文件重新导出。');
- const data=JSON.parse(raw) as Recording;
+ if(!raw&&!allowStatic)throw new Error('这个 SVG 没有播放轨迹。旧版静态 SVG 需要从 C / Python 源文件重新导出。');
+ const data=(raw?JSON.parse(raw):{format:'code-to-magic-motion',version:1,duration:60,time:0}) as Recording;
  if(data.format!=='code-to-magic-motion'||data.version!==1)throw new Error('不支持的 SVG 播放格式版本');
  if(!Number.isFinite(data.duration)||data.duration<0||data.duration>10000||!Number.isFinite(data.time)||data.time<0||data.time>data.duration)throw new Error('无效的播放时长');
  const tracks:{element:Element;motion:Motion}[]=[];
@@ -123,7 +123,7 @@ export function readRecording(text:string){
   return out;
  }
  const svg=copy(doc.documentElement) as SVGSVGElement;
- if(!tracks.length)throw new Error('SVG 中没有可播放的图形轨迹');
+ if(!tracks.length&&!allowStatic)throw new Error('SVG 中没有可播放的图形轨迹');
  svg.style.width='100%';svg.style.height='100%';
  svg.setAttribute('role','img');svg.setAttribute('aria-label','导入的魔法阵动画');
  const seek=(time:number)=>{

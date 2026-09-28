@@ -11,11 +11,12 @@ import {buildTimeline,samplePlayback} from './playback';
 import {executionHighlights} from './execution';
 import {recordSvg,readRecording} from './svgPlayback';
 import {SvgPlayer} from './SvgPlayer';
-import {CastPage,type CastAsset} from './CastPage';
+import {CastPage,type CastAsset,type CastSession} from './CastPage';
 import './style.css';
 function App(){
  const route=()=>['forge','player','cast'].includes(location.hash.slice(2))?location.hash.slice(2):'forge';
  const [page,setPage]=useState(route),[castAsset,setCastAsset]=useState<CastAsset|null>(null);
+ const castSession=useRef<CastSession>({});
  useEffect(()=>{const change=()=>setPage(route());window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[]);
  const [source,setSource]=useState(samples['dijkstra.c']),[filename,setFilename]=useState('dijkstra.c');
  const language=languageForFile(filename);
@@ -48,7 +49,7 @@ function App(){
  function castImported(){if(!recording)return;setCastAsset({text:new XMLSerializer().serializeToString(recording.value.svg),name:recording.name});location.hash='/cast';}
  return <div className="app" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)void loadFile(f);}}>
   <header><a className="brand" href="#/forge"><span className="brand-seal">✳</span><span>CODE TO MAGIC<small>代码炼成术 / LOCAL ATELIER</small></span></a><nav className="page-nav" aria-label="页面导航">{[['forge','代码炼成'],['player','法阵播放'],['cast','施法合成']].map(([id,label])=><a key={id} href={`#/${id}`} aria-current={page===id?'page':undefined}>{label}</a>)}</nav><div className="header-right"><button onClick={()=>recordingInput.current?.click()}>导入 SVG 动画 ↗</button><input ref={recordingInput} type="file" accept=".svg" aria-label="导入 SVG 动画文件" hidden onChange={e=>{const file=e.target.files?.[0];if(file)void loadSvg(file);e.target.value='';}}/><span className="local"><i/> 本地处理</span></div></header>
-  {page==='cast'&&<CastPage asset={castAsset}/>}
+  {page==='cast'&&<CastPage asset={castAsset} onAsset={setCastAsset} onCurrent={castCurrent} onImported={castImported} session={castSession.current}/>}
   <div hidden={page!=='player'}>{recording?<main><button onClick={castImported}>用于施法 ↗</button><SvgPlayer active={page==='player'} recording={recording.value} name={recording.name} onClose={()=>{location.hash='/forge';}}/></main>:<main className="empty-page"><h1>法阵档案</h1><p>导入项目 SVG，播放保存的符文与表针轨迹。</p><button onClick={()=>recordingInput.current?.click()}>选择 SVG</button></main>}</div>
   {page!=='forge'&&error&&<p className="error" role="alert">{error}</p>}
   <main hidden={page!=='forge'}><section className="intro"><div><div className="eyebrow">THE ANATOMY OF A SPELL</div><h1>让逻辑，显现为魔法。</h1><p>每一个函数是一重法环，每一道分支是一枚符文。</p></div><div className="intro-note"><button disabled={!model||busy} onClick={castCurrent}>用于施法 ↗</button><br/>C / PYTHON → ARCANE GEOMETRY<br/><span>结构赋予形态，指纹留下印记。</span></div></section>
