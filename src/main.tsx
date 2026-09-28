@@ -11,19 +11,24 @@ import {buildTimeline,samplePlayback} from './playback';
 import {executionHighlights} from './execution';
 import {recordSvg,readRecording} from './svgPlayback';
 import {SvgPlayer} from './SvgPlayer';
+import {CastPage,type CastAsset} from './CastPage';
 import './style.css';
 function App(){
+ const route=()=>['forge','player','cast'].includes(location.hash.slice(2))?location.hash.slice(2):'forge';
+ const [page,setPage]=useState(route),[castAsset,setCastAsset]=useState<CastAsset|null>(null);
+ useEffect(()=>{const change=()=>setPage(route());window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[]);
  const [source,setSource]=useState(samples['dijkstra.c']),[filename,setFilename]=useState('dijkstra.c');
  const language=languageForFile(filename);
  const [mode,setMode]=useState<ViewMode>('stack'),[hidden,setHidden]=useState<string[]>([]),[solo,setSolo]=useState<string|null>(null),[spacing,setSpacing]=useState(160),[orbit,setOrbit]=useState(18);
  const [resultChoice,setResultChoice]=useState<ResultKind|'auto'>('auto');
  const [recording,setRecording]=useState<{value:ReturnType<typeof readRecording>;name:string}|null>(null);
  const recordingInput=useRef<HTMLInputElement>(null);
- async function loadSvg(file:File){try{if(file.size>20_000_000)throw new Error('SVG 超过 20 MB');const value=readRecording(await file.text());setPlaying(false);setRecording({value,name:file.name});setError('');}catch(e){setError(`SVG 导入失败：${e instanceof Error?e.message:String(e)}`);}}
+ async function loadSvg(file:File){try{if(file.size>20_000_000)throw new Error('SVG 超过 20 MB');const value=readRecording(await file.text());setPlaying(false);setRecording({value,name:file.name});location.hash='/player';setError('');}catch(e){setError(`SVG 导入失败：${e instanceof Error?e.message:String(e)}`);}}
  useEffect(()=>{setHidden([]);setSolo(null);setResultChoice('auto');},[source,language]);
  const [model,setModel]=useState<Model|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(true);
  const [selected,setSelected]=useState<Node|null>(null),[hover,setHover]=useState<Node|null>(null),[expanded,setExpanded]=useState<string|null>(null);
  const [playing,setPlaying]=useState(false),[time,setTime]=useState(0),[speed,setSpeed]=useState(1),[tilt,setTilt]=useState(.57),[zoom,setZoom]=useState(1),[glow,setGlow]=useState(true);
+ useEffect(()=>{setPlaying(false);},[page]);
  const svgRef=useRef<SVGSVGElement>(null),fileRef=useRef<HTMLInputElement>(null),version=useRef(0);
  useEffect(()=>{const ticket=++version.current;setBusy(true);setPlaying(false);const id=setTimeout(()=>{analyzeSource(source,language).then(m=>{if(ticket!==version.current)return;setModel(m);setError('');setSelected(null);setExpanded(null);setTime(0);setBusy(false);}).catch(e=>{if(ticket===version.current){setError(String(e));setBusy(false);}});},300);return()=>clearTimeout(id);},[source,language]);
  const timeline=useMemo(()=>buildTimeline(model||{functions:[],trace:[],sourceHash:'',semanticHash:'',diagnostics:[],directives:[]}),[model]);
@@ -39,10 +44,14 @@ function App(){
  const radiusReport=mainRadii(planes);
  const resultKind=resultChoice==='auto'?(model?inferResultKind(model):'unknown'):resultChoice;
  const info=hover||selected; const active=model?.functions.flatMap(f=>f.nodes).find(n=>n.id===execution[0]?.nodeId);
- if(recording)return <div className="app"><main><SvgPlayer recording={recording.value} name={recording.name} onClose={()=>setRecording(null)}/></main></div>;
+ function castCurrent(){if(!svgRef.current||!model||busy)return;setCastAsset({text:new XMLSerializer().serializeToString(recordSvg(svgRef.current,timeline,time)),name:filename});location.hash='/cast';}
+ function castImported(){if(!recording)return;setCastAsset({text:new XMLSerializer().serializeToString(recording.value.svg),name:recording.name});location.hash='/cast';}
  return <div className="app" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)void loadFile(f);}}>
-  <header><a className="brand" href="#"><span className="brand-seal">✳</span><span>CODE TO MAGIC<small>代码炼成术 / LOCAL ATELIER</small></span></a><div className="header-right"><button onClick={()=>recordingInput.current?.click()}>导入 SVG 动画 ↗</button><input ref={recordingInput} type="file" accept=".svg" aria-label="导入 SVG 动画文件" hidden onChange={e=>{const file=e.target.files?.[0];if(file)void loadSvg(file);e.target.value='';}}/><span className="local"><i/> 本地解析 · 文件不会上传</span><span className="edition">EXPERIMENT 001</span></div></header>
-  <main><section className="intro"><div><div className="eyebrow">THE ANATOMY OF A SPELL</div><h1>让逻辑，显现为魔法。</h1><p>每一个函数是一重法环，每一道分支是一枚符文。</p></div><div className="intro-note">C / PYTHON → ARCANE GEOMETRY<br/><span>结构赋予形态，指纹留下印记。</span></div></section>
+  <header><a className="brand" href="#/forge"><span className="brand-seal">✳</span><span>CODE TO MAGIC<small>代码炼成术 / LOCAL ATELIER</small></span></a><nav className="page-nav" aria-label="页面导航">{[['forge','代码炼成'],['player','法阵播放'],['cast','施法合成']].map(([id,label])=><a key={id} href={`#/${id}`} aria-current={page===id?'page':undefined}>{label}</a>)}</nav><div className="header-right"><button onClick={()=>recordingInput.current?.click()}>导入 SVG 动画 ↗</button><input ref={recordingInput} type="file" accept=".svg" aria-label="导入 SVG 动画文件" hidden onChange={e=>{const file=e.target.files?.[0];if(file)void loadSvg(file);e.target.value='';}}/><span className="local"><i/> 本地处理</span></div></header>
+  {page==='cast'&&<CastPage asset={castAsset}/>}
+  <div hidden={page!=='player'}>{recording?<main><button onClick={castImported}>用于施法 ↗</button><SvgPlayer active={page==='player'} recording={recording.value} name={recording.name} onClose={()=>{location.hash='/forge';}}/></main>:<main className="empty-page"><h1>法阵档案</h1><p>导入项目 SVG，播放保存的符文与表针轨迹。</p><button onClick={()=>recordingInput.current?.click()}>选择 SVG</button></main>}</div>
+  {page!=='forge'&&error&&<p className="error" role="alert">{error}</p>}
+  <main hidden={page!=='forge'}><section className="intro"><div><div className="eyebrow">THE ANATOMY OF A SPELL</div><h1>让逻辑，显现为魔法。</h1><p>每一个函数是一重法环，每一道分支是一枚符文。</p></div><div className="intro-note"><button disabled={!model||busy} onClick={castCurrent}>用于施法 ↗</button><br/>C / PYTHON → ARCANE GEOMETRY<br/><span>结构赋予形态，指纹留下印记。</span></div></section>
   <p className="motion-note">自转、公转方向由函数的语法、嵌套和运算特征分别决定，主副环可同向或反向；同类结果印方向一致。SVG 可重新导入动态播放。</p>
   <div className="workspace"><section className="code-panel"><div className="panel-title"><span><b>01</b> 源典 SOURCE</span><button onClick={()=>fileRef.current?.click()}>导入 .c / .py ↗</button><input ref={fileRef} type="file" accept=".c,.py" aria-label="导入源码文件" hidden onChange={e=>{const f=e.target.files?.[0];if(f)void loadFile(f);e.target.value='';}}/></div><div className="filebar"><span title={filename}>◇ {filename}</span><select aria-label="源码语言" value={language} onChange={e=>{const next=e.target.value as SourceLanguage;setFilename(filename.replace(/\.(c|py)$/i,next==='python'?'.py':'.c'));}}><option value="c">C</option><option value="python">Python</option></select><select aria-label="示例代码" value={samples[filename]===source?filename:''} onChange={e=>{if(e.target.value){setFilename(e.target.value);setSource(samples[e.target.value]);}}}><option value="" disabled>选择示例</option>{Object.keys(samples).map(k=><option key={k}>{k}</option>)}</select></div>
   <Editor source={source} language={language} onChange={setSource} selection={selected?.range||null} execution={execution} onPosition={p=>{const ns=model?.functions.flatMap(f=>f.nodes).filter(n=>n.range.start<=p&&n.range.end>=p).sort((a,b)=>(a.range.end-a.range.start)-(b.range.end-b.range.start));setSelected(ns?.[0]||null);}}/>

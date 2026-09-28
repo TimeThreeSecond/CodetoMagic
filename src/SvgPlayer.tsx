@@ -1,9 +1,10 @@
 import {useEffect,useRef,useState} from 'react';
 import {readRecording} from './svgPlayback';
 
-export function SvgPlayer({recording,name,onClose}:{recording:ReturnType<typeof readRecording>;name:string;onClose:()=>void}){
+export function SvgPlayer({recording,name,onClose,active=true}:{recording:ReturnType<typeof readRecording>;name:string;onClose:()=>void;active?:boolean}){
  const host=useRef<HTMLDivElement>(null);
  const [time,setTime]=useState(recording.data.time),[playing,setPlaying]=useState(false),[speed,setSpeed]=useState(1);
+ useEffect(()=>{if(!active)setPlaying(false);},[active]);
  useEffect(()=>{host.current?.replaceChildren(recording.svg);return()=>recording.svg.remove();},[recording]);
  useEffect(()=>recording.seek(time),[recording,time]);
  useEffect(()=>{

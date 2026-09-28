@@ -8,3 +8,5 @@
 .filebar select {max-width:44%}
 .cm-editor .code-execution-active {background:#9b773c66;box-shadow:inset 0 -1px #ffe7a5;color:#fff3cf}
 .cm-editor .code-execution-waiting {background:#70563655;box-shadow:inset 0 -1px #ca9a56;color:#edc58a}
+[hidden]{display:none!important}
+.page-nav{display:flex;gap:6px;flex-wrap:wrap}.page-nav a{color:#93aaa4;text-decoration:none;padding:10px 14px;border:1px solid transparent;border-radius:4px}.page-nav a[aria-current="page"]{color:#ecd294;border-color:#57736b;background:#12241f}.empty-page{min-height:65vh;padding:60px 24px}header{flex-wrap:wrap;gap:16px}
