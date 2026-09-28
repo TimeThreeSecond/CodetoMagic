@@ -1,16 +1,18 @@
 import Parser from 'web-tree-sitter';
-import runtimeUrl from 'web-tree-sitter/tree-sitter.wasm?url';
-import grammarUrl from 'tree-sitter-wasms/out/tree-sitter-c.wasm?url';
+import {sourceParser, type SourceLanguage} from './parser';
 import {sigils} from './sigils';
 
 type N = Parser.SyntaxNode;
 export type Range = {start: number; end: number; line: number; endLine: number};
-export type Node = {id: string; kind: string; label: string; range: Range; depth: number; family: string; target?: string; pointers: number; sigils?:string[]};
+export type Node = {id: string; kind: string; label: string; range: Range; depth: number; family: string; target?: string; targetId?: string; pointers: number; sigils?:string[]};
 export type Fn = {id: string; name: string; range: Range; nodes: Node[]; order: number; reachable: boolean; returnType?:string};
-export type Model = {sourceHash: string; semanticHash: string; functions: Fn[]; trace: string[]; diagnostics: Range[]; directives: string[]};
-let init: Promise<Parser> | undefined;
-async function parser() {
- return init ??= (async () => {await Parser.init({locateFile: () => runtimeUrl}); const p = new Parser(); p.setLanguage(await Parser.Language.load(grammarUrl)); return p;})();
+export type Model = {sourceHash: string; semanticHash: string; functions: Fn[]; trace: string[]; diagnostics: Range[]; directives: string[]; language?: SourceLanguage; entryId?: string};
+export function entryFunction(model: Model) {
+ return model.functions.find(f=>f.id===model.entryId)||model.functions.find(f=>f.name==='main')||model.functions.find(f=>f.id!=='globals');
+}
+/** Python's empty targetId explicitly denotes an unresolved dynamic call. */
+export function calledFunction(model: Pick<Model,'functions'>, node: Node) {
+ return node.targetId !== undefined ? model.functions.find(f=>f.id===node.targetId) : model.functions.find(f=>f.name===node.target);
 }
 export function family(name: string) {
  if (/^(malloc|calloc|realloc|free|memcpy|memset|memmove)$/.test(name)) return 'memory';
@@ -26,10 +28,10 @@ function lexicalSigils(n:N):string[]{const out:string[]=[];function scan(c:N){if
 function declaredName(n: N | null): string {if (!n) return ''; if(n.type === 'identifier') return n.text; return declaredName(n.childForFieldName('declarator'));}
 export async function hash(s: string) {return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');}
 export async function analyzeCSource(source: string): Promise<Model> {
- const p = await parser(); const tree = p.parse(source); const root = tree.rootNode;
+ const p = await sourceParser('c'); const tree = p.parse(source); const root = tree.rootNode;
  const range = (n: N): Range => ({start:n.startIndex,end:n.endIndex,line:n.startPosition.row+1,endLine:n.endPosition.row+1});
  const diagnostics: Range[]=[]; const directives:string[]=[];
- function inspect(n:N) {if(n.type==='ERROR'||n.isMissing()) diagnostics.push(range(n)); if(n.type.startsWith('preproc_')) directives.push(n.text.split('\n')[0]); n.namedChildren.forEach(inspect);}
+ function inspect(n:N) {if(n.type==='ERROR'||n.isMissing()) diagnostics.push(range(n)); if(n.type.startsWith('preproc_')) directives.push(n.text.split('\n')[0]); n.children.forEach(inspect);}
  inspect(root);
  const defs = root.namedChildren.filter(n=>n.type==='function_definition');
  const functions: Fn[] = defs.map((f,i)=>{

@@ -15,7 +15,7 @@ export function SvgPlayer({recording,name,onClose}:{recording:ReturnType<typeof 
  useEffect(()=>{if(time>=recording.data.duration)setPlaying(false);},[time,recording]);
  return <section className="visual-panel svg-player" aria-label="SVG 动画播放器">
   <div className="panel-title"><span>SVG 法阵档案 · {name}</span><button onClick={onClose}>返回源码工作台</button></div>
-  <p>独立播放已保存的图形与表针轨迹，无需 C 源码。保留导出时的视图、可见图层和相位。</p>
+  <p>独立播放已保存的图形与表针轨迹，无需 C / Python 源码。保留导出时的视图、可见图层和相位。</p>
   <div ref={host} className="scene-wrap" style={{height:'70vh'}}/>
   <div className="transport">
    <button disabled={!recording.data.duration} onClick={()=>{if(time>=recording.data.duration)setTime(0);setPlaying(p=>!p);}}>{playing?'Ⅱ 暂停':'▷ 播放 SVG'}</button>

@@ -73,4 +73,22 @@ const engraved:Record<string,string>={
 };
 for(const [key,path] of Object.entries(engraved))sigils[key]={...sigils[key],path};
 for(const [key,base,extra] of [ ['<=','<','M-7 12 H7'],['>=','>','M-7 12 H7'],['++','+','M-10 -10 H-4 M-7 -13 V-7'],['--','-','M-9 -10 H-3'],['+=','+','M-8 12 H8'],['-=','-','M-8 12 H8'],['*=','*','M-8 12 H8'],['/=','/','M-8 12 H8'],['%=','%','M-8 12 H8'],['<<','<','M12 -9 L-2 0 L12 9'],['>>','>','M-12 -9 L2 0 L-12 9']])sigils[key]={path:sigils[base].path+' '+extra,meaning:key+' 运算'};
-export function nodeSigil(kind:string){return ({if_statement:'if',switch_statement:'switch',case_statement:'case',for_statement:'for',while_statement:'while',do_statement:'do',return_statement:'return',break_statement:'break',continue_statement:'continue',goto_statement:'goto',struct_specifier:'struct',call_expression:'call',declaration:'bind',group:'group',ERROR:'error'} as Record<string,string>)[kind]||'flow';}
+// Python uses the same geometric vocabulary for equivalent control/operation
+// semantics. Source spelling is retained in tokens/tooltips, not converted to C text.
+for(const [key,base,meaning] of [
+ ['def','bind','函数定义与名称绑定'],['class','struct','类：组织属性与方法'],
+ ['import','extern','引用外部模块'],['from','extern','从模块引入名称'],['as','bind','别名绑定'],
+ ['and','&&','逻辑与'],['or','||','逻辑或'],['not','!','逻辑非'],['elif','if','替代条件分支'],
+ ['True','const','真值'],['False','const','假值'],['None','void','无值'],
+ ['is','==','对象身份判定'],['in','enum','成员判定或迭代入口'],
+ ['//','/','向下取整除法'],['**','*','幂运算'],[':=','=','赋值表达式'],
+ ['match','switch','模式选择'],['case','case','匹配入口'],
+ ['try','switch','异常保护块'],['except','case','异常处理分支'],['finally','flow','收尾路径'],
+ ['raise','return','抛出异常'],['with','const','上下文管理'],['yield','return','生成器产出'],
+ ['await','call','异步等待'],['async','inline','异步定义'],['lambda','bind','匿名函数'],
+ ['assert','if','断言检查'],['pass','flow','空语句'],['del','break','删除绑定'],
+ ['global','extern','模块作用域绑定'],['nonlocal','extern','外层作用域绑定']
+])sigils[key]={path:sigils[base].path,meaning};
+for(const [key,base] of [['**=','**'],['//=','//'],['&=','&'],['|=','|'],['^=','^'],['<<=','<<'],['>>=','>>']])
+ sigils[key]={path:sigils[base].path+' M-8 12 H8',meaning:key+' 运算'};
+export function nodeSigil(kind:string){return ({if_statement:'if',switch_statement:'switch',case_statement:'case',for_statement:'for',while_statement:'while',do_statement:'do',return_statement:'return',break_statement:'break',continue_statement:'continue',goto_statement:'goto',struct_specifier:'struct',call_expression:'call',declaration:'bind',group:'group',ERROR:'error',try_statement:'try',except_clause:'except',finally_clause:'finally',with_statement:'with',raise_statement:'raise',yield_statement:'yield',await_expression:'await',lambda_expression:'lambda'} as Record<string,string>)[kind]||'flow';}

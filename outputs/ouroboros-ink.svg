@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 800 800" role="img" aria-label="东方墨线风格的环状衔尾蛇">
+  <defs>
+    <radialGradient id="rice"><stop stop-color="#f5efe0"/><stop offset="1" stop-color="#ddd2bb"/></radialGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#17191a"/><stop offset=".5" stop-color="#475158"/><stop offset="1" stop-color="#101a20"/></linearGradient>
+    <path id="sweep" d="M 470 142 C 610 170 674 300 664 434 C 655 589 538 673 403 665 C 243 656 139 554 132 413 C 123 263 237 139 383 132"/>
+  </defs>
+  <rect width="800" height="800" fill="url(#rice)"/>
+  <g fill="none" stroke="#70787a" opacity=".33"><path d="M103 398 C100 203 260 93 411 96 M683 407 C679 590 555 699 402 704" stroke-width="3"/><circle cx="400" cy="400" r="316" stroke-dasharray="1 11"/></g>
+  <use xlink:href="#sweep" fill="none" stroke="#9b9c90" stroke-width="78" opacity=".45" transform="translate(8 9)"/>
+  <use xlink:href="#sweep" fill="none" stroke="url(#ink)" stroke-width="69" stroke-linecap="round"/>
+  <use xlink:href="#sweep" fill="none" stroke="#f6f1e5" stroke-width="3" stroke-dasharray="5 14"/>
+  <path d="M383 131 Q397 122 411 129 L394 145 Z" fill="#c8cec8" stroke="#161e22" stroke-width="3"/>
+  <path d="M472 119 Q492 107 515 122 Q505 141 482 151 Q461 155 439 133 L418 131 Q439 120 453 125 Z" fill="#202a2c" stroke="#111719" stroke-width="4"/>
+  <path d="M514 123 Q483 124 454 132 L417 131 Q450 151 481 148" fill="none" stroke="#ece8d7" stroke-width="3"/>
+  <path d="M443 130 L450 143 L458 131 M461 132 L467 145 L475 132" fill="none" stroke="#f2ede0" stroke-width="2"/>
+  <path d="M469 116 Q476 109 483 116 Q476 124 469 116 Z" fill="#c0443d"/>
+  <g fill="none" stroke="#263438" opacity=".66" stroke-linecap="round">
+    <path d="M259 395 C285 330 345 289 408 290 M543 397 C520 465 464 510 395 517 M278 450 C336 544 469 555 543 470" stroke-width="3"/>
+    <path d="M303 378 C332 343 362 331 396 327 M496 374 C480 352 458 339 436 333 M344 473 C370 493 397 498 431 492" stroke-width="1.4"/>
+    <circle cx="400" cy="400" r="91" stroke-width="1" stroke-dasharray="2 11"/>
+  </g>
+  <circle cx="400" cy="400" r="28" fill="none" stroke="#a9473e" stroke-width="3"/>
+  <path d="M400 359 V441 M359 400 H441" stroke="#a9473e" stroke-width="1.5" opacity=".7"/>
+  <g fill="#a9473e"><circle cx="400" cy="312" r="3"/><circle cx="488" cy="400" r="3"/><circle cx="400" cy="488" r="3"/><circle cx="312" cy="400" r="3"/></g>
+  <text x="400" y="752" fill="#394044" font-family="Georgia,serif" font-size="15" text-anchor="middle" letter-spacing="7">OUROBOROS · III</text>
+</svg>

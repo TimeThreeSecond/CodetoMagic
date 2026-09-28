@@ -1,4 +1,5 @@
 import type {Model,Node} from './analysis';
+import {calledFunction,entryFunction} from './analysis';
 import {sigils} from './sigils';
 import {visibleNodes} from './Scene';
 import {buildPlanes,layerProjection,radialPeriod,rotationAt,mainRadii,preferredRadius,tokenLayout,orbitalPeriod,inferFunctionResultKind,CORE_PERIOD,resultSeals,type ResultKind,type ViewMode} from './planes';
@@ -8,12 +9,15 @@ import {compactRadius} from './compactLayout';
 import {samplePlayback,handAngle,type Timeline} from './playback';
 import {MagicHand,type HandKind} from './MagicHand';
 import {functionDirection,resultDirection,spin,directionName,ROTATION_RULE} from './rotation';
-type Props={model:Model;timeline:Timeline;time:number;step:number;selected:string|null;onSelect:(n:Node)=>void;onHover:(n:Node|null)=>void;expanded:string|null;setExpanded:(id:string|null)=>void;tilt:number;zoom:number;glow:boolean;svgRef:React.RefObject<SVGSVGElement|null>;mode:ViewMode;hidden:string[];solo:string|null;spacing:number;resultKind:ResultKind;orbit:number};
+import type {ExecutionHighlight} from './execution';
+type Props={model:Model;execution:ExecutionHighlight[];timeline:Timeline;time:number;step:number;selected:string|null;onSelect:(n:Node)=>void;onHover:(n:Node|null)=>void;expanded:string|null;setExpanded:(id:string|null)=>void;tilt:number;zoom:number;glow:boolean;svgRef:React.RefObject<SVGSVGElement|null>;mode:ViewMode;hidden:string[];solo:string|null;spacing:number;resultKind:ResultKind;orbit:number};
 const polar=(angle:number,radius:number)=>({x:Math.cos(angle*Math.PI/180)*radius,y:Math.sin(angle*Math.PI/180)*radius});
-export function Scene({model,timeline,time,step,selected,onSelect,onHover,expanded,setExpanded,tilt,zoom,glow,svgRef,mode,hidden,solo,spacing,resultKind,orbit}:Props){
- const all=buildPlanes(model),radii=mainRadii(all),playback=samplePlayback(timeline,time),active=playback.event?.nodeId;
+export function Scene({model,execution,timeline,time,step,selected,onSelect,onHover,expanded,setExpanded,tilt,zoom,glow,svgRef,mode,hidden,solo,spacing,resultKind,orbit}:Props){
+ const all=buildPlanes(model),radii=mainRadii(all),playback=samplePlayback(timeline,time);
+ const statuses=new Map(execution.map(h=>[h.nodeId,h.status]));
+ const executionColor=(status:string|undefined)=>status==='active'?'#fff3ba':status==='waiting'?'#f3bf78':undefined;
  const safeSpacing=spacing;
- const centerOwner=model.functions.find(f=>f.name==='main')||all[0]?.functions[0];
+ const centerOwner=entryFunction(model)||all[0]?.functions[0];
  const kindFor=(fn:typeof model.functions[number])=>fn.id===centerOwner?.id?resultKind:inferFunctionResultKind(fn);
  const projections=all.map((plane,index)=>({...plane,index,...layerProjection(index,all.length,mode,tilt,safeSpacing)}));
  const layers=projections.filter(l=>mode==='single'?l.id===(solo||all[0]?.id):!hidden.includes(l.id));
@@ -51,8 +55,8 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
   });
  });
  const seal=resultSeals[resultKind];
- return <svg ref={svgRef} data-view={mode} data-rotation-rule={ROTATION_RULE} viewBox={`${-boundX} ${-boundY} ${boundX*2} ${boundY*2}`} role="img" aria-label="C 源码的主副环魔法阵" xmlns="http://www.w3.org/2000/svg" style={{width:'100%',height:'100%'}}>
- <metadata>{JSON.stringify({fileHash:model.sourceHash,structureHash:model.semanticHash,version:6,time,step,mode,hidden,solo,playback:{event:playback.step,stack:playback.stack,progress:playback.progress,ended:playback.ended},result:{kind:resultKind,period:CORE_PERIOD,owner:centerOwner?.id},layout:{solver:'measured-glyph-compact-v1',functions:all.flatMap(l=>l.functions.map(f=>({name:f.name,...compactRadius(f,l.satellites.filter(s=>s.ownerId===f.id).map(s=>s.fn)),placedRadius:radii.get(f.id)})))},projection:{tilt,zoom,spacing,effectiveSpacing:safeSpacing},layers:all.map(l=>({name:l.name,color:l.color,period:l.period,functions:l.functions.map((f,i)=>({name:f.name,radius:radii.get(f.id),resultType:kindFor(f),period:radialPeriod(l.period,i)})),satellites:l.satellites.map((s,i)=>({name:s.fn.name,owner:s.ownerId,period:radialPeriod(l.period,i+1),orbitPeriod:orbitalPeriod(orbit,all.indexOf(l)+i),resultType:inferFunctionResultKind(s.fn)}))}))})}</metadata>
+ return <svg ref={svgRef} data-view={mode} data-language={model.language||'c'} data-rotation-rule={ROTATION_RULE} viewBox={`${-boundX} ${-boundY} ${boundX*2} ${boundY*2}`} role="img" aria-label={`${model.language==='python'?'Python':'C'} 源码的主副环魔法阵`} xmlns="http://www.w3.org/2000/svg" style={{width:'100%',height:'100%'}}>
+ <metadata>{JSON.stringify({fileHash:model.sourceHash,structureHash:model.semanticHash,language:model.language||'c',entryId:centerOwner?.id,version:6,time,step,mode,hidden,solo,playback:{event:playback.step,stack:playback.stack,progress:playback.progress,ended:playback.ended},result:{kind:resultKind,period:CORE_PERIOD,owner:centerOwner?.id},layout:{solver:'measured-glyph-compact-v1',functions:all.flatMap(l=>l.functions.map(f=>({name:f.name,...compactRadius(f,l.satellites.filter(s=>s.ownerId===f.id).map(s=>s.fn)),placedRadius:radii.get(f.id)})))},projection:{tilt,zoom,spacing,effectiveSpacing:safeSpacing},layers:all.map(l=>({name:l.name,color:l.color,period:l.period,functions:l.functions.map((f,i)=>({name:f.name,radius:radii.get(f.id),resultType:kindFor(f),period:radialPeriod(l.period,i)})),satellites:l.satellites.map((s,i)=>({name:s.fn.name,owner:s.ownerId,period:radialPeriod(l.period,i+1),orbitPeriod:orbitalPeriod(orbit,all.indexOf(l)+i),resultType:inferFunctionResultKind(s.fn)}))}))})}</metadata>
  <defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation=".8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
  <rect x={-boundX} y={-boundY} width={boundX*2} height={boundY*2} fill="#091313"/>
  <g transform={`scale(${zoom})`}>
@@ -64,25 +68,26 @@ export function Scene({model,timeline,time,step,selected,onSelect,onHover,expand
    <title>{directionName(r.direction)} · {r.period}s</title>
    <g filter={glow?'url(#glow)':undefined}><RingFrame kind={r.resultType} radius={r.radius} small={r.satellite} hash={model.sourceHash}/></g>
    {r.layout.map(({node:n,angle,tokens,pitch})=>{
-    const p=polar(angle,r.radius),lit=n.id===active||n.members?.some(m=>m.id===active),focus=n.id===selected||n.members?.some(m=>m.id===selected);
+    const status=statuses.get(n.id)||n.members?.map(m=>statuses.get(m.id)).find(Boolean);
+    const p=polar(angle,r.radius),lit=!!status,focus=n.id===selected||n.members?.some(m=>m.id===selected);
     const scale=(r.satellite?.38:.62)*Math.min(1,pitch/17);
-    return <g key={n.id} data-node={n.id} role="button" tabIndex={0} aria-label={`${n.label}，第 ${n.range.line} 行`} onClick={()=>{if(n.members)setExpanded(expanded===n.id?null:n.id);onSelect(n);}} onKeyDown={e=>{if(e.key==='Enter'){if(n.members)setExpanded(n.id);onSelect(n);}}} onMouseEnter={()=>onHover(n)} onMouseLeave={()=>onHover(null)} style={{cursor:'pointer'}}>
+    return <g key={n.id} data-node={n.id} data-execution={status||'none'} data-highlight-nodes={JSON.stringify(n.members?.map(m=>m.id)||[n.id])} data-base-stroke={n.kind==='ERROR'?'#f1988b':focus?'#fff5d4':l.color} data-base-width="1.4" stroke={executionColor(status)||(n.kind==='ERROR'?'#f1988b':focus?'#fff5d4':l.color)} strokeWidth={lit?2.2:1.4} role="button" tabIndex={0} aria-label={`${n.label}，第 ${n.range.line} 行`} onClick={()=>{if(n.members)setExpanded(expanded===n.id?null:n.id);onSelect(n);}} onKeyDown={e=>{if(e.key==='Enter'){if(n.members)setExpanded(n.id);onSelect(n);}}} onMouseEnter={()=>onHover(n)} onMouseLeave={()=>onHover(null)} style={{cursor:'pointer'}}>
      <circle cx={p.x} cy={p.y} r={r.satellite?11:18} fill="#091313" fillOpacity=".01" stroke="none"/>
-     {tokens.map(({token,angle:a},j)=>{const p=polar(a,r.radius);return <g key={j} data-sigil={token} data-token-angle={a} transform={`translate(${p.x} ${p.y}) rotate(${a+90}) scale(${scale})`}><title>{token} · {sigils[token]?.meaning}</title><path d={sigils[token]?.path||sigils.flow.path} stroke={n.kind==='ERROR'?'#f1988b':focus?'#fff5d4':l.color} strokeWidth="1.4" filter={glow?'url(#glow)':undefined}/></g>;})}
+     {tokens.map(({token,angle:a},j)=>{const p=polar(a,r.radius);return <g key={j} data-sigil={token} data-token-angle={a} transform={`translate(${p.x} ${p.y}) rotate(${a+90}) scale(${scale})`}><title>{token} · {sigils[token]?.meaning}</title><path d={sigils[token]?.path||sigils.flow.path} filter={glow?'url(#glow)':undefined}/></g>;})}
 
 
     </g>;
    })}
   </g>
-  {!r.satellite&&<g data-feature-field={r.fn.name} data-motion={r.rotationMotion} transform={`rotate(${r.angle})`}>{r.features.map(f=><g key={f.node.id} data-feature-node={f.node.id} transform={`translate(${f.x} ${f.y})`} onClick={()=>onSelect(f.node)} onMouseEnter={()=>onHover(f.node)} onMouseLeave={()=>onHover(null)} style={{cursor:'pointer'}}><title>{f.node.label} · 第 {f.node.range.line} 行</title><Medallion node={f.node} size={f.size}/></g>)}</g>}
-  {!r.satellite&&<text x="0" y={-(r.radius+38)} textAnchor="middle" stroke="none" fill={l.color} fontFamily="monospace" fontSize="11">{r.fn.name==='main'?'中环':r.fn.name}</text>}
+  {!r.satellite&&<g data-feature-field={r.fn.name} data-motion={r.rotationMotion} transform={`rotate(${r.angle})`}>{r.features.map(f=><g key={f.node.id} data-feature-node={f.node.id} data-execution={statuses.get(f.node.id)||'none'} data-highlight-nodes={JSON.stringify([f.node.id])} data-base-stroke={l.color} data-base-width=".7" stroke={executionColor(statuses.get(f.node.id))||l.color} filter={statuses.has(f.node.id)&&glow?'url(#glow)':undefined} transform={`translate(${f.x} ${f.y})`} onClick={()=>onSelect(f.node)} onMouseEnter={()=>onHover(f.node)} onMouseLeave={()=>onHover(null)} style={{cursor:'pointer'}}><title>{f.node.label} · 第 {f.node.range.line} 行</title><Medallion node={f.node} size={f.size}/></g>)}</g>}
+  {!r.satellite&&<text x="0" y={-(r.radius+38)} textAnchor="middle" stroke="none" fill={l.color} fontFamily="monospace" fontSize="11">{r.fn.id===centerOwner?.id?'中环':r.fn.name}</text>}
   {r.satellite&&<g data-satellite-result={r.resultType} data-inner-period={CORE_PERIOD} data-motion={JSON.stringify({kind:'rotate',rate:resultDirection(r.resultType)*360/CORE_PERIOD})} transform={`rotate(${resultDirection(r.resultType)*rotationAt(time,CORE_PERIOD)})`}><ResultCrest kind={r.resultType} radius={r.radius*.58}/></g>}
   <MagicHand kind={r.handKind} result={r.resultType} radius={r.radius} coreRadius={r.satellite?r.radius*.58:Math.min(85,Math.min(...l.functions.map(f=>radii.get(f.id)!))*.22)} length={r.radius*(r.handKind==='minute'?.72:r.handKind==='hour'?.46:.55)} angle={r.handAngle} fnName={r.fn.name} waiting={r.waiting}/>
  </g>)}
  {l.functions.some(f=>f.id===centerOwner?.id)&&<g data-result-core={resultKind} data-inner-period={CORE_PERIOD} data-motion={JSON.stringify({kind:'rotate',rate:resultDirection(resultKind)*360/CORE_PERIOD})} transform={`rotate(${resultDirection(resultKind)*rotationAt(time,CORE_PERIOD)})`} opacity=".9" strokeWidth="1"><ResultCrest kind={resultKind} radius={Math.min(85,Math.min(...l.functions.map(f=>radii.get(f.id)!))*.22)}/><title>统一结果印：{seal.label} · {CORE_PERIOD}s · {directionName(resultDirection(resultKind))}</title></g>}
  </g>)}
- <g fill="none" strokeWidth=".8" opacity=".45" pointerEvents="none">{rings.flatMap(r=>r.fn.nodes.map(n=>{const target=model.functions.find(f=>f.name===n.target),a=positions.get(n.id),b=target?.nodes[0]?positions.get(target.nodes[0].id):null;if(!a||!b||(target!==r.fn&&n.id!==selected))return null;return <path key={n.id} data-call-edge="true" stroke={r.plane.color} strokeDasharray="3 5" d={target===r.fn?`M${a.x} ${a.y} c70 -90 -70 -90 0 0`:`M${a.x} ${a.y} Q0 ${Math.min(a.y,b.y)-30} ${b.x} ${b.y}`}/>;}))}</g>
+ <g fill="none" strokeWidth=".8" opacity=".45" pointerEvents="none">{rings.flatMap(r=>r.fn.nodes.map(n=>{const target=calledFunction(model,n),a=positions.get(n.id),b=target?.nodes[0]?positions.get(target.nodes[0].id):null;if(!a||!b||(target!==r.fn&&n.id!==selected))return null;return <path key={n.id} data-call-edge="true" stroke={r.plane.color} strokeDasharray="3 5" d={target===r.fn?`M${a.x} ${a.y} c70 -90 -70 -90 0 0`:`M${a.x} ${a.y} Q0 ${Math.min(a.y,b.y)-30} ${b.x} ${b.y}`}/>;}))}</g>
  {!layers.length&&<text textAnchor="middle" fill="#a3b9a6" fontSize="14">所有图层已隐藏，请在图层面板中开启。</text>}
- </g><text x={-boundX+25} y={boundY-18} fontFamily="monospace" fontSize="9" fill="#789a85">SEAL · {model.sourceHash.slice(0,32).toUpperCase()}</text><text x={boundX-25} y={boundY-18} textAnchor="end" fontFamily="monospace" fontSize="9" fill="#789a85">{mode.toUpperCase()} / C SIGILS v0.6</text>
+ </g><text x={-boundX+25} y={boundY-18} fontFamily="monospace" fontSize="9" fill="#789a85">SEAL · {model.sourceHash.slice(0,32).toUpperCase()}</text><text x={boundX-25} y={boundY-18} textAnchor="end" fontFamily="monospace" fontSize="9" fill="#789a85">{mode.toUpperCase()} / {model.language==='python'?'PYTHON':'C'} SIGILS v0.7</text>
  </svg>;
 }

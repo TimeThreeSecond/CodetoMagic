@@ -1,7 +1,8 @@
 import type {Model} from './analysis';
+import {calledFunction,entryFunction} from './analysis';
 export type PlaybackEvent={fnId:string;nodeId:string;fromId:string|null;start:number;duration:number;kind:'move'|'wait';stack:string[];positions:Record<string,string>;clocks:Record<string,number>};
 export type Timeline={events:PlaybackEvent[];duration:number;finalPositions:Record<string,string>;finalClocks:Record<string,number>;truncated:boolean};
-/** Structural call/return demonstration, not C evaluation. Each call site is
+/** Structural call/return demonstration, not source evaluation. Each call site is
  * replayed; recursive cycles are held briefly rather than expanded forever. */
 export function buildTimeline(model:Model):Timeline{
  const events:PlaybackEvent[]=[],positions:Record<string,string>={},clocks:Record<string,number>={};
@@ -16,14 +17,14 @@ export function buildTimeline(model:Model):Timeline{
   const fn=model.functions.find(f=>f.id===fnId)!;const stack=[...ancestors,fnId];
   for(const n of fn.nodes){
    if(!append(fnId,n.id,stack,'move'))return;
-   if(n.target){const callee=model.functions.find(f=>f.name===n.target);
+   if(n.target){const callee=calledFunction(model,n);
     if(callee&&!stack.includes(callee.id)&&stack.length<16)visit(callee.id,stack);
     else if(!append(fnId,n.id,stack,'wait'))return;
    }
    if(truncated)return;
   }
  }
- const entry=model.functions.find(f=>f.name==='main')||model.functions.find(f=>f.id!=='globals');
+ const entry=entryFunction(model);
  if(entry)visit(entry.id,[]);
  return {events,duration:time,finalPositions:{...positions},finalClocks:{...clocks},truncated};
 }

@@ -1,4 +1,5 @@
 import {handAngle,type Timeline} from './playback';
+import {highlightTracks,mergeHighlightSpans,highlightAt,type HighlightSpan} from './execution';
 
 export type Segment={start:number;duration:number;from:number;to:number};
 export type Motion={kind:'rotate';rate:number}|{kind:'orbit';rate:number;radius:number;phase:number}|{kind:'hand';rate:number;direction:number;segments:Segment[]};
@@ -20,7 +21,15 @@ export function recordSvg(svg:SVGSVGElement,timeline:Timeline,time:number){
   const rate=direction*360/Number(ring.getAttribute('data-period'));
   const segments=timeline.events.filter(e=>e.fnId===id&&e.kind==='move').map(e=>({start:e.start,duration:e.duration,from:angles[e.fromId||'']??-90,to:angles[e.nodeId]??-90}));
   container.querySelector('[data-magic-hand]')?.setAttribute('data-motion',JSON.stringify({kind:'hand',rate,direction,segments} satisfies Motion));
-  container.removeAttribute('data-node-angles');
+ container.removeAttribute('data-node-angles');
+ }
+ const highlights=highlightTracks(timeline);
+ for(const element of clone.querySelectorAll('[data-highlight-nodes]')){
+  const ids=JSON.parse(element.getAttribute('data-highlight-nodes')||'[]') as string[];
+  const spans=mergeHighlightSpans(ids.flatMap(id=>highlights.get(id)||[]));
+  element.setAttribute('data-execution-track',JSON.stringify(spans));
+  element.setAttribute('data-execution-final',String(ids.includes(timeline.events.at(-1)?.nodeId||'')));
+  element.removeAttribute('data-highlight-nodes');
  }
  // Selection edges are transient editor UI, not part of a portable recording.
  clone.querySelectorAll('[data-call-edge]').forEach(e=>e.remove());
@@ -68,12 +77,13 @@ export function readRecording(text:string){
  const doc=new DOMParser().parseFromString(text,'image/svg+xml');
  if(doc.querySelector('parsererror')||doc.documentElement.localName!=='svg'||doc.documentElement.namespaceURI!==NS)throw new Error('不是有效的 SVG 文件');
  const raw=doc.querySelector('metadata[id="magic-playback"]')?.textContent;
- if(!raw)throw new Error('这个 SVG 没有播放轨迹。旧版静态 SVG 需要从 C 文件重新导出。');
+ if(!raw)throw new Error('这个 SVG 没有播放轨迹。旧版静态 SVG 需要从 C / Python 源文件重新导出。');
  const data=JSON.parse(raw) as Recording;
  if(data.format!=='code-to-magic-motion'||data.version!==1)throw new Error('不支持的 SVG 播放格式版本');
  if(!Number.isFinite(data.duration)||data.duration<0||data.duration>10000||!Number.isFinite(data.time)||data.time<0||data.time>data.duration)throw new Error('无效的播放时长');
  const tracks:{element:Element;motion:Motion}[]=[];
- let count=0,segments=0;
+ const highlights:{element:Element;spans:HighlightSpan[];stroke:string;width:string;final:boolean}[]=[];
+ let count=0,segments=0,highlightCount=0;
  function copy(el:Element):Element|null {
   if(++count>100000)throw new Error('SVG 节点数量过多');
   if(!elements.has(el.localName)||el.namespaceURI!==NS)return null;
@@ -92,6 +102,20 @@ export function readRecording(text:string){
    if(segments>6000)throw new Error('播放事件过多');
    tracks.push({element:out,motion});out.setAttribute('data-motion',JSON.stringify(motion));
   }
+  const rawHighlight=el.getAttribute('data-execution-track');
+  if(rawHighlight){
+   const spans=JSON.parse(rawHighlight) as HighlightSpan[];
+   if(!Array.isArray(spans)||spans.length>6000)throw new Error('无效的高亮轨迹');
+   let end=0;
+   for(const span of spans){
+    if(!span||!Number.isFinite(span.start)||!Number.isFinite(span.duration)||span.start<end-1e-7||span.duration<=0||span.start+span.duration>data.duration+1e-7||!['active','waiting'].includes(span.status))throw new Error('无效的高亮时间段');
+    end=span.start+span.duration;
+   }
+   highlightCount+=spans.length;if(highlightCount>192000)throw new Error('高亮事件过多');
+   const width=out.getAttribute('data-base-width')||'1.4';
+   if(!Number.isFinite(Number(width))||Number(width)<=0||Number(width)>50)throw new Error('无效的高亮线宽');
+   highlights.push({element:out,spans,stroke:out.getAttribute('data-base-stroke')||out.getAttribute('stroke')||'#81e4cf',width,final:out.getAttribute('data-execution-final')==='true'});
+  }
   for(const child of el.childNodes){
    if(child.nodeType===Node.ELEMENT_NODE){const c=copy(child as Element);if(c)out.append(c);}
    else if(child.nodeType===Node.TEXT_NODE)out.append(document.createTextNode(child.textContent||''));
@@ -105,6 +129,12 @@ export function readRecording(text:string){
  const seek=(time:number)=>{
   const t=Math.max(0,Math.min(data.duration,time));
   for(const {element,motion} of tracks)element.setAttribute('transform',motionTransform(motion,t));
+  for(const {element,spans,stroke,width,final} of highlights){
+   const status=highlightAt(spans,t,data.duration,final);
+   element.setAttribute('data-execution',status||'none');
+   element.setAttribute('stroke',status==='active'?'#fff3ba':status==='waiting'?'#f3bf78':stroke);
+   element.setAttribute('stroke-width',status?'2.2':width);
+  }
  };
  seek(data.time);
  return {svg,data,seek};

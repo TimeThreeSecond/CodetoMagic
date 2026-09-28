@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 800 800" role="img" aria-label="炼金手稿风格的环状衔尾蛇">
+  <defs>
+    <radialGradient id="paper"><stop stop-color="#292824"/><stop offset="1" stop-color="#111716"/></radialGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8c986"/><stop offset=".5" stop-color="#9d7543"/><stop offset="1" stop-color="#ead8a3"/></linearGradient>
+    <path id="coil" d="M 455 137 A 267 267 0 1 1 386 133"/>
+    <g id="ray"><path d="M400 64 V85 M394 76 L400 68 L406 76"/></g>
+    <g id="scale"><path d="M0 -10 Q11 0 0 10 Q-11 0 0 -10 M0 -10 V10"/></g>
+  </defs>
+  <rect width="800" height="800" fill="url(#paper)"/>
+  <g fill="none" stroke="#8e7346" stroke-width="1.2" opacity=".73">
+    <circle cx="400" cy="400" r="326"/><circle cx="400" cy="400" r="318" stroke-dasharray="2 8"/>
+    <circle cx="400" cy="400" r="213" stroke-dasharray="2 5"/>
+    <use xlink:href="#ray"/><use xlink:href="#ray" transform="rotate(30 400 400)"/><use xlink:href="#ray" transform="rotate(60 400 400)"/><use xlink:href="#ray" transform="rotate(90 400 400)"/><use xlink:href="#ray" transform="rotate(120 400 400)"/><use xlink:href="#ray" transform="rotate(150 400 400)"/><use xlink:href="#ray" transform="rotate(180 400 400)"/><use xlink:href="#ray" transform="rotate(210 400 400)"/><use xlink:href="#ray" transform="rotate(240 400 400)"/><use xlink:href="#ray" transform="rotate(270 400 400)"/><use xlink:href="#ray" transform="rotate(300 400 400)"/><use xlink:href="#ray" transform="rotate(330 400 400)"/>
+  </g>
+  <use xlink:href="#coil" fill="none" stroke="#171714" stroke-width="68" stroke-linecap="round"/>
+  <use xlink:href="#coil" fill="none" stroke="url(#body)" stroke-width="60" stroke-linecap="round"/>
+  <use xlink:href="#coil" fill="none" stroke="#27201a" stroke-width="1.3" stroke-dasharray="3 8"/>
+  <use xlink:href="#coil" fill="none" stroke="#fff0bb" stroke-width="2" stroke-dasharray="1 14" transform="translate(-13 -8)" opacity=".75"/>
+  <path d="M379 138 Q396 116 416 134 L389 144 Z" fill="#e8cf94" stroke="#151b17" stroke-width="3"/>
+  <path d="M458 115 Q482 100 504 116 Q493 137 471 147 Q450 151 427 132 L421 124 Q436 124 449 129 Q459 126 458 115 Z" fill="#bc985a" stroke="#171a17" stroke-width="4"/>
+  <path d="M503 117 Q480 117 462 126 L427 126 L447 137 Q475 147 489 134" fill="none" stroke="#fff1bc" stroke-width="3"/>
+  <path d="M428 126 L436 135 L443 127 M447 127 L455 137 L461 127" fill="none" stroke="#201a16" stroke-width="2"/>
+  <path d="M465 113 Q471 106 477 114 Q473 120 465 113 Z" fill="#221c19"/><circle cx="472" cy="113" r="1.7" fill="#f6d497"/>
+  <path d="M500 117 Q509 122 509 133" fill="none" stroke="#a67646" stroke-width="2"/>
+  <g fill="none" stroke="#d6b677" stroke-width="1.5" opacity=".85">
+    <path d="M400 285 L515 400 L400 515 L285 400 Z"/>
+    <circle cx="400" cy="400" r="80"/><circle cx="400" cy="400" r="20"/>
+    <path d="M400 287 V513 M287 400 H513 M343 343 L457 457 M457 343 L343 457"/>
+    <path d="M400 335 L433 400 L400 465 L367 400 Z"/>
+  </g>
+  <g fill="#d7b879"><circle cx="400" cy="257" r="3"/><circle cx="543" cy="400" r="3"/><circle cx="400" cy="543" r="3"/><circle cx="257" cy="400" r="3"/></g>
+  <text x="400" y="753" fill="#c6a76f" font-family="Georgia,serif" font-size="15" text-anchor="middle" letter-spacing="7">OUROBOROS · I</text>
+</svg>

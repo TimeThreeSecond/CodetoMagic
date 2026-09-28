@@ -32,11 +32,11 @@ with sync_playwright() as p:
     expect(page.locator('.filebar')).to_contain_text('recursion.c')
     expect(page.locator('.code-footer')).to_contain_text('已同步')
     assert page.locator('svg path[d*="c70 -90"]').count() == 1
-    page.locator('input[type=file]').set_input_files({"name":"unicode.c","mimeType":"text/plain","buffer":'// 中文注释\nint main(void) { int x = 1; return x; }'.encode('utf-8')})
+    page.get_by_label('导入源码文件').set_input_files({"name":"unicode.c","mimeType":"text/plain","buffer":'// 中文注释\nint main(void) { int x = 1; return x; }'.encode('utf-8')})
     expect(page.locator('.code-footer')).to_contain_text('已同步')
     page.get_by_role('button', name='return statement，第 2 行').click()
     assert 'return x' in page.locator('.code-highlight').all_text_contents()[0]
-    page.locator('input[type=file]').set_input_files({"name":"broken.c","mimeType":"text/plain","buffer":b'int main(void) { int x = ; return 0; }'})
+    page.get_by_label('导入源码文件').set_input_files({"name":"broken.c","mimeType":"text/plain","buffer":b'int main(void) { int x = ; return 0; }'})
     expect(page.locator('.code-footer')).to_contain_text('待检查')
     page.get_by_label('示例代码').select_option('memory.c')
     expect(page.locator('.code-footer')).to_contain_text('已同步')

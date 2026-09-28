@@ -1,6 +1,10 @@
 # 魔法阵导出
 所有 PNG 为 1680×1460 静态快照；SVG 包含源文件 SHA-256、视图、旋转相位、周期与结果类型元数据。动画请打开本地应用。
 
+## Python · 圆周率
+
+源文件：`../examples/pi.py`，Chudnovsky + 二分拆分，默认计算小数点后 1000 位（截断）。`pi-sigil.svg` 是正视重叠的可重播法阵，`pi-sigil.png` 是同帧快照。页面示例选择 `pi.py` 即可重新生成，或运行 `python tests/python_browser.py`（先启动开发服务）。Python 与 C 复用同一符文、分层、半径、旋转与指针规则；顶层语句形成模块入口中环。浏览器不会执行这段 Python。
+
 `dijkstra-replay.svg` 是新版可重播示例，包含图形轨迹；使用页首「导入 SVG 动画」即可独立播放，无需导入 C 文件。其他旧版 SVG 为历史静态导出，不包含完整播放轨迹。普通 SVG 查看器将新版文件显示为静态图。
 
 ## Dijkstra · v0.6

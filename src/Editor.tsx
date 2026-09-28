@@ -1,8 +1,11 @@
 import {useEffect,useRef} from 'react';
 import {EditorView,Decoration,ViewPlugin,ViewUpdate} from '@codemirror/view';
-import {StateEffect,StateField} from '@codemirror/state';
+import {StateEffect,StateField,Compartment} from '@codemirror/state';
 import {basicSetup} from 'codemirror';
 import {cpp} from '@codemirror/lang-cpp';
+import {python} from '@codemirror/lang-python';
+import type {SourceLanguage} from './parser';
+import type {ExecutionHighlight} from './execution';
 import {HighlightStyle,syntaxHighlighting} from '@codemirror/language';
 import {tags} from '@lezer/highlight';
 const syntaxTheme=syntaxHighlighting(HighlightStyle.define([
@@ -14,11 +17,25 @@ const syntaxTheme=syntaxHighlighting(HighlightStyle.define([
 ]));
 const mark=StateEffect.define<{from:number;to:number}|null>();
 const highlights=StateField.define({create:()=>Decoration.none,update(value,tr){value=value.map(tr.changes);for(const e of tr.effects)if(e.is(mark))value=e.value&&e.value.from<e.value.to?Decoration.set([Decoration.mark({class:'code-highlight'}).range(e.value.from,e.value.to)]):Decoration.none;return value;},provide:f=>EditorView.decorations.from(f)});
-export function Editor({source,onChange,onPosition,selection}:{source:string;onChange:(s:string)=>void;onPosition:(p:number)=>void;selection:{start:number;end:number}|null}) {
+const executionMark=StateEffect.define<ExecutionHighlight[]>();
+const executionMarks=StateField.define({create:()=>Decoration.none,update(value,tr){
+ value=value.map(tr.changes);
+ for(const e of tr.effects)if(e.is(executionMark))value=Decoration.set(e.value.filter(h=>h.range.start>=0&&h.range.start<h.range.end&&h.range.end<=tr.state.doc.length).map(h=>Decoration.mark({class:`code-execution code-execution-${h.status}`,attributes:{'data-execution-node':h.nodeId,'data-execution-status':h.status}}).range(h.range.start,h.range.end)),true);
+ return value;
+},provide:f=>EditorView.decorations.from(f)});
+export function Editor({source,language,onChange,onPosition,selection,execution}:{source:string;language:SourceLanguage;onChange:(s:string)=>void;onPosition:(p:number)=>void;selection:{start:number;end:number}|null;execution:ExecutionHighlight[]}) {
+ const languageConfig=useRef(new Compartment());
  const host=useRef<HTMLDivElement>(null),view=useRef<EditorView|null>(null); const callbacks=useRef({onChange,onPosition});callbacks.current={onChange,onPosition};
- useEffect(()=>{const v=new EditorView({doc:source,parent:host.current!,extensions:[basicSetup,cpp(),highlights,EditorView.theme({'&':{height:'100%',backgroundColor:'#0e1818',color:'#b7c9c0'},'.cm-scroller':{fontFamily:'Consolas, monospace',fontSize:'12px'},'.cm-gutters':{backgroundColor:'#0e1818',color:'#4f6f64',border:'none'},'.cm-activeLine':{backgroundColor:'#172a25'},'.cm-activeLineGutter':{backgroundColor:'#172a25'},'&.cm-focused .cm-cursor':{borderLeftColor:'#b9e2bb'},'.cm-selectionBackground, &.cm-focused .cm-selectionBackground':{backgroundColor:'#28473d'},'.code-highlight':{backgroundColor:'#37513c',color:'#e3f1ba'}},{dark:true}),ViewPlugin.fromClass(class{update(u:ViewUpdate){if(u.docChanged)callbacks.current.onChange(u.state.doc.toString());if(u.selectionSet)callbacks.current.onPosition(u.state.selection.main.head);}})]});view.current=v;return()=>v.destroy();},[]);
+ useEffect(()=>{const v=new EditorView({doc:source,parent:host.current!,extensions:[basicSetup,languageConfig.current.of(cpp()),highlights,executionMarks,EditorView.theme({'&':{height:'100%',backgroundColor:'#0e1818',color:'#b7c9c0'},'.cm-scroller':{fontFamily:'Consolas, monospace',fontSize:'12px'},'.cm-gutters':{backgroundColor:'#0e1818',color:'#4f6f64',border:'none'},'.cm-activeLine':{backgroundColor:'#172a25'},'.cm-activeLineGutter':{backgroundColor:'#172a25'},'&.cm-focused .cm-cursor':{borderLeftColor:'#b9e2bb'},'.cm-selectionBackground, &.cm-focused .cm-selectionBackground':{backgroundColor:'#28473d'},'.code-highlight':{backgroundColor:'#37513c',color:'#e3f1ba'}},{dark:true}),ViewPlugin.fromClass(class{update(u:ViewUpdate){if(u.docChanged)callbacks.current.onChange(u.state.doc.toString());if(u.selectionSet)callbacks.current.onPosition(u.state.selection.main.head);}})]});view.current=v;return()=>v.destroy();},[]);
+ useEffect(()=>{view.current?.dispatch({effects:languageConfig.current.reconfigure(language==='python'?python():cpp())});},[language]);
  useEffect(()=>{const v=view.current;if(v&&v.state.doc.toString()!==source)v.dispatch({changes:{from:0,to:v.state.doc.length,insert:source}});},[source]);
  useEffect(()=>{view.current?.dispatch({effects:StateEffect.appendConfig.of(syntaxTheme)});},[]);
  useEffect(()=>{const v=view.current;if(!v)return;const valid=selection&&selection.end<=v.state.doc.length?{from:selection.start,to:selection.end}:null;v.dispatch({effects:[mark.of(valid),...(valid?[EditorView.scrollIntoView(valid.from,{y:'center'})]:[])]});},[selection]);
+ const executionKey=JSON.stringify(execution);
+ useEffect(()=>{
+  const v=view.current;if(!v)return;
+  const marks=JSON.parse(executionKey) as ExecutionHighlight[];
+  v.dispatch({effects:executionMark.of(marks)});
+ },[executionKey]);
  return <div ref={host} className="editor-host"/>;
 }

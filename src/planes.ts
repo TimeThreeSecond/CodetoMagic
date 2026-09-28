@@ -1,4 +1,5 @@
 import type {Model,Fn,Node} from './analysis';
+import {calledFunction,entryFunction} from './analysis';
 import {nodeSigil} from './sigils';
 import {compactRadius,nodeArc,glyphWidth} from './compactLayout';
 export type ViewMode='stack'|'front'|'single';
@@ -6,23 +7,23 @@ export type Satellite={fn:Fn;ownerId:string};
 export type Plane={id:string;name:string;functions:Fn[];satellites:Satellite[];color:string;period:number};
 export const CORE_PERIOD=12;
 export function layerColor(index:number){return ['#81e4cf','#edbd79','#9ebcff','#e6a0c6','#bade84','#bdabf1'][index]||`hsl(${(index*137.508)%360} 65% 72%)`;}
-export function isSimple(fn:Fn,model:Model){return fn.id!=='globals'&&fn.nodes.length<=12&&!fn.nodes.some(n=>/if_|switch_|case_|for_|while_|do_|goto_/.test(n.kind)||(n.target&&model.functions.some(f=>f.name===n.target)));}
+export function isSimple(fn:Fn,model:Model){return fn.id!=='globals'&&fn.nodes.length<=12&&!fn.nodes.some(n=>/if_|switch_|case_|for_|while_|do_|goto_|try_|except_/.test(n.kind)||calledFunction(model,n));}
 export function buildPlanes(model:Model):Plane[]{
  const ordered=[...model.functions].sort((a,b)=>Number(a.reachable)-Number(b.reachable)||a.order-b.order);
  // Small, uniquely-owned leaf helpers become satellites. Shared callees and
  // recursion stay independent; every source node is retained exactly once.
- const owners=new Map<string,string>();
+ const owners=new Map<string,string>(),entry=entryFunction(model);
  for(const fn of ordered){
-  const callers=ordered.filter(f=>f.nodes.some(n=>n.target===fn.name));
-  const internal=fn.nodes.some(n=>ordered.some(f=>f.name===n.target));
-  if(fn.id!=='globals'&&fn.name!=='main'&&!isSimple(fn,model)&&!internal&&callers.length===1&&callers[0]!==fn&&fn.nodes.length<=18&&fn.nodes.length<callers[0].nodes.length*.85)owners.set(fn.id,callers[0].id);
+  const callers=ordered.filter(f=>f.nodes.some(n=>calledFunction(model,n)?.id===fn.id));
+  const internal=fn.nodes.some(n=>calledFunction(model,n));
+  if(fn.id!=='globals'&&fn.id!==entry?.id&&!isSimple(fn,model)&&!internal&&callers.length===1&&callers[0]!==fn&&fn.nodes.length<=18&&fn.nodes.length<callers[0].nodes.length*.85)owners.set(fn.id,callers[0].id);
  }
  const roots=ordered.filter(f=>!owners.has(f.id)),simple=roots.filter(f=>isSimple(f,model));
  const planes:Plane[]=[];let added=false;
  for(const fn of roots){
   if(simple.includes(fn)&&added)continue;
   const functions=simple.includes(fn)?simple:[fn];if(simple.includes(fn))added=true;
-  planes.push({id:simple.includes(fn)?'simple':fn.id,name:functions.length>1?'简单函数共面':fn.name==='main'?'中环 · main':fn.name,functions,satellites:ordered.filter(f=>functions.some(root=>root.id===owners.get(f.id))).map(f=>({fn:f,ownerId:owners.get(f.id)!})),color:'',period:12});
+  planes.push({id:simple.includes(fn)?'simple':fn.id,name:functions.length>1?'简单函数共面':fn.id===entry?.id?`中环 · ${fn.name}`:fn.name,functions,satellites:ordered.filter(f=>functions.some(root=>root.id===owners.get(f.id))).map(f=>({fn:f,ownerId:owners.get(f.id)!})),color:'',period:12});
  }
  return planes.map((p,i)=>({...p,color:layerColor(i),period:planes.length===1?12:3+Math.round(i*17/(planes.length-1))}));
 }
@@ -33,6 +34,8 @@ export function orbitalPeriod(base:number,index:number){return Math.min(25,Math.
 export function inferFunctionResultKind(fn:Fn):ResultKind{
  if(/path|dijkstra|shortest/i.test(fn.name))return 'path';
  if(/bool|_Bool/.test(fn.returnType||''))return 'decision';
+ if(/\bstr\b/.test(fn.returnType||''))return 'text';
+ if(/\b(list|tuple|dict|set|Sequence|Iterable|Iterator)\b/.test(fn.returnType||''))return 'collection';
  if(/int|float|double|long|short|size_t/.test(fn.returnType||''))return 'number';
  if(fn.nodes.some(n=>n.family==='string'||n.family==='io'))return 'text';
  return 'unknown';
@@ -75,6 +78,7 @@ export function inferResultKind(model:Model):ResultKind{
  if(model.functions.some(f=>/dijkstra|shortest|print_path|find_path/i.test(f.name)))return 'path';
  if(model.functions.some(f=>f.nodes.some(n=>n.family==='string')))return 'text';
  if(model.functions.some(f=>/gcd|sum|factorial|count/i.test(f.name)))return 'number';
+ if(model.language==='python'){const entry=entryFunction(model);if(entry)return inferFunctionResultKind(entry);}
  return 'unknown';
 }
 export function motif(kind:string){
