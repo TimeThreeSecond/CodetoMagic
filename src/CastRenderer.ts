@@ -2,7 +2,7 @@ import * as T from 'three';
 import type {CastingAsset} from './castingAsset';
 import {unfold} from './castingMath';
 export type CastPose={position:T.Vector3;rotation:T.Quaternion};
-export type CastSettings={size:number;spacing:number;offset:number;fov:number;duration:number;flip:boolean;pitch:number;yaw:number;roll:number;reverse:boolean;solo:number;glow:number};
+export type CastSettings={size:number;spacing:number;offset:number;fov:number;duration:number;flip:boolean;pitch:number;yaw:number;roll:number;reverse:boolean;solo:number;glow:number;order:number[]};
 export class CastRenderer{
  readonly renderer:T.WebGLRenderer;
  readonly camera=new T.PerspectiveCamera(50,1,.05,100);
@@ -29,15 +29,15 @@ export class CastRenderer{
   }})();this.pending=task;try{await task;}finally{if(this.pending===task)this.pending=null;}
  }
  draw(settings:CastSettings,pose:CastPose,elapsed:number,visibility:number,dt:number,snap=false){
+  if(this.disposed)return;
   const a=snap?1:1-Math.exp(-dt*14);this.pose.position.lerp(pose.position,a);this.pose.rotation.slerp(pose.rotation,a);
   this.root.position.copy(this.pose.position);this.root.quaternion.copy(this.pose.rotation);
   this.root.quaternion.multiply(new T.Quaternion().setFromEuler(new T.Euler(settings.pitch*Math.PI/180,settings.yaw*Math.PI/180,settings.roll*Math.PI/180)));
   if(settings.flip)this.root.rotateY(Math.PI);
   this.camera.fov=settings.fov;this.camera.updateProjectionMatrix();
-  this.meshes.forEach((mesh,i)=>{const rank=settings.reverse?this.meshes.length-1-i:i,u=unfold(elapsed,settings.duration,rank,this.meshes.length);
+  this.meshes.forEach((mesh,i)=>{const base=settings.order.indexOf(i)>=0?settings.order.indexOf(i):i,rank=settings.reverse?this.meshes.length-1-base:base,u=unfold(elapsed,settings.duration,rank,this.meshes.length);
    mesh.position.z=settings.offset+rank*settings.spacing;mesh.scale.setScalar(settings.size*2*u.scale);mesh.material.opacity=u.opacity*visibility;
    mesh.material.color.setScalar(1+settings.glow);mesh.visible=settings.solo<0||settings.solo===i;
-   const z=mesh.getWorldPosition(new T.Vector3()).z;mesh.renderOrder=Math.round(-z*1000);
   });
   // Explicit far-to-near ordering for transparent parallel planes.
   const sorted=[...this.meshes].sort((a,b)=>a.getWorldPosition(new T.Vector3()).z-b.getWorldPosition(new T.Vector3()).z);sorted.forEach((m,i)=>m.renderOrder=i);

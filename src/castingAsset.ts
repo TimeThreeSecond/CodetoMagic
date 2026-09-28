@@ -3,6 +3,7 @@ const NS='http://www.w3.org/2000/svg';
 export function castingAsset(text:string){
  const recording=readRecording(text,true),svg=recording.svg;
  const groups=Array.from(svg.querySelectorAll<SVGGElement>('[data-layer]'));
+ if(groups.length>64)throw new Error('施法素材最多支持 64 个独立图层，请先减少图层。');
  // Entry core is the nearest layer; keep original order for the remaining layers.
  groups.sort((a,b)=>Number(!!b.querySelector('[data-result-core]'))-Number(!!a.querySelector('[data-result-core]')));
  const box=(svg.getAttribute('viewBox')||'0 0 1000 1000').trim().split(/[ ,]+/).map(Number);

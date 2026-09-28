@@ -4,9 +4,10 @@ import {readRecording} from './svgPlayback';
 export function SvgPlayer({recording,name,onClose,active=true}:{recording:ReturnType<typeof readRecording>;name:string;onClose:()=>void;active?:boolean}){
  const host=useRef<HTMLDivElement>(null);
  const [time,setTime]=useState(recording.data.time),[playing,setPlaying]=useState(false),[speed,setSpeed]=useState(1);
+ useEffect(()=>{setTime(recording.data.time);setPlaying(false);},[recording]);
  useEffect(()=>{if(!active)setPlaying(false);},[active]);
  useEffect(()=>{host.current?.replaceChildren(recording.svg);return()=>recording.svg.remove();},[recording]);
- useEffect(()=>recording.seek(time),[recording,time]);
+ useEffect(()=>{const t=Math.max(0,Math.min(time,recording.data.duration));recording.seek(t);recording.data.time=t;const metadata=recording.svg.querySelector('#magic-playback');if(metadata)metadata.textContent=JSON.stringify(recording.data);},[recording,time]);
  useEffect(()=>{
   if(!playing)return;
   let frame=0,last=0;
