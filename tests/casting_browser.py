@@ -27,6 +27,14 @@ def alpha_area(page):
       return count?(x1-x0)*(y1-y0):0;
     }''')
 
+def alpha_sum(page):
+    return page.locator('.cast-canvas canvas').evaluate('''canvas => {
+      const c=document.createElement('canvas');c.width=canvas.width;c.height=canvas.height;
+      const ctx=c.getContext('2d');ctx.drawImage(canvas,0,0);
+      const d=ctx.getImageData(0,0,c.width,c.height).data;
+      let sum=0;for(let i=3;i<d.length;i+=4)sum+=d[i];return sum;
+    }''')
+
 with sync_playwright() as p:
     flags=['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']
     if args.camera_feed:
@@ -60,6 +68,31 @@ with sync_playwright() as p:
     frozen=page.get_by_label('法阵时间').input_value()
     page.wait_for_timeout(300)
     assert page.get_by_label('法阵时间').input_value()==frozen
+    # Actual GPU pixels: alpha enhancement must exceed the old result, not just
+    # brighten RGB; zero opacity must leave no rectangular texture background.
+    page.get_by_role('button',name='展开与输出',exact=True).click()
+    opacity=page.get_by_label('法阵不透明度',exact=True)
+    expect(opacity).to_have_value('100')
+    baseline=alpha_sum(page)
+    opacity.fill('200')
+    page.wait_for_timeout(250)
+    enhanced=alpha_sum(page)
+    assert enhanced>baseline*1.05, (baseline,enhanced)
+    opacity.fill('25')
+    page.wait_for_timeout(250)
+    reduced=alpha_sum(page)
+    assert 0<reduced<baseline*.4, (reduced,baseline)
+    opacity.fill('0')
+    page.wait_for_timeout(250)
+    assert alpha_sum(page)==0
+    with page.expect_download() as transparent_download:
+        page.get_by_role('button',name='导出当前画面 PNG ↓',exact=True).click()
+    transparent_target=out/'casting-zero-opacity.png'
+    transparent_download.value.save_as(transparent_target)
+    from PIL import Image
+    with Image.open(transparent_target) as png:
+        assert png.convert('RGB').getextrema()==((9,9),(19,19),(19,19))
+    opacity.fill('150')
     page.get_by_role('button',name='空间与透视',exact=True).click()
     page.get_by_label('图层间距',exact=True).fill('1.1')
     page.get_by_label('后移图层 1',exact=True).click()
@@ -67,6 +100,9 @@ with sync_playwright() as p:
     page.get_by_role('link',name='代码炼成',exact=True).click()
     expect(page.locator('.editor-host')).to_be_visible()
     page.get_by_role('link',name='施法合成',exact=True).click()
+    page.get_by_role('button',name='展开与输出',exact=True).click()
+    expect(page.get_by_label('法阵不透明度',exact=True)).to_have_value('150')
+    page.get_by_label('法阵不透明度',exact=True).fill('100')
     page.get_by_role('button',name='空间与透视',exact=True).click()
     expect(page.get_by_label('图层间距',exact=True)).to_have_value('1.1')
     page.get_by_role('button',name='输入与素材',exact=True).click()
@@ -133,6 +169,6 @@ with sync_playwright() as p:
     assert 0<first_area<alpha_area(page)*.5, 'Slow SVG decoding must not skip unfolding'
     page.screenshot(path=str(out/'casting-final.png'),full_page=True)
     assert not errors, errors
-    print('PASS: unfolding, pagination, local hand inference, PNG, video seek, camera cleanup, static SVG sanitization')
+    print('PASS: opacity GPU pixels/export/persistence, unfolding, pagination, local hand inference, PNG, video seek, camera cleanup, static SVG sanitization')
     context.close()
     browser.close()

@@ -2,18 +2,28 @@ import * as T from 'three';
 import type {CastingAsset} from './castingAsset';
 import {unfold} from './castingMath';
 export type CastPose={position:T.Vector3;rotation:T.Quaternion};
-export type CastSettings={size:number;spacing:number;offset:number;fov:number;duration:number;flip:boolean;pitch:number;yaw:number;roll:number;reverse:boolean;solo:number;glow:number;order:number[]};
+export type CastSettings={size:number;spacing:number;offset:number;fov:number;duration:number;flip:boolean;pitch:number;yaw:number;roll:number;reverse:boolean;solo:number;glow:number;opacity:number;order:number[]};
 export class CastRenderer{
  readonly renderer:T.WebGLRenderer;
  readonly camera=new T.PerspectiveCamera(50,1,.05,100);
  private scene=new T.Scene();private root=new T.Group();private meshes:T.Mesh<T.PlaneGeometry,T.MeshBasicMaterial>[]=[];
  private disposed=false;private pending:Promise<void>|null=null;private observer:ResizeObserver;
+ private opacityStrength={value:1};
  private pose:CastPose={position:new T.Vector3(0,0,-8),rotation:new T.Quaternion()};
  constructor(readonly host:HTMLElement,readonly asset:CastingAsset){
   this.renderer=new T.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});
   this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));this.renderer.setClearColor(0,0);host.append(this.renderer.domElement);
   this.scene.add(this.root);
-  this.meshes=asset.layers.map(()=>{const material=new T.MeshBasicMaterial({transparent:true,depthWrite:false,side:T.DoubleSide});const mesh=new T.Mesh(new T.PlaneGeometry(1,1),material);this.root.add(mesh);return mesh;});
+  this.meshes=asset.layers.map(()=>{const material=new T.MeshBasicMaterial({transparent:true,depthWrite:false,side:T.DoubleSide});
+   material.onBeforeCompile=shader=>{
+    shader.uniforms.castOpacityStrength=this.opacityStrength;
+    shader.fragmentShader='uniform float castOpacityStrength;\n'+shader.fragmentShader;
+    // Boost source alpha, not RGB. Cap at the lifecycle opacity so unfolding and
+    // tracking fades retain their curves; fully transparent pixels stay empty.
+    shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\ndiffuseColor.a = min(opacity, diffuseColor.a * castOpacityStrength);');
+   };
+   material.customProgramCacheKey=()=> 'cast-opacity-v1';
+   const mesh=new T.Mesh(new T.PlaneGeometry(1,1),material);this.root.add(mesh);return mesh;});
   this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(host);this.resize();
  }
  private resize(){const w=this.host.clientWidth,h=this.host.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
@@ -30,6 +40,7 @@ export class CastRenderer{
  }
  draw(settings:CastSettings,pose:CastPose,elapsed:number,visibility:number,dt:number,snap=false){
   if(this.disposed)return;
+  this.opacityStrength.value=T.MathUtils.clamp(settings.opacity??1,0,2);
   const a=snap?1:1-Math.exp(-dt*14);this.pose.position.lerp(pose.position,a);this.pose.rotation.slerp(pose.rotation,a);
   this.root.position.copy(this.pose.position);this.root.quaternion.copy(this.pose.rotation);
   this.root.quaternion.multiply(new T.Quaternion().setFromEuler(new T.Euler(settings.pitch*Math.PI/180,settings.yaw*Math.PI/180,settings.roll*Math.PI/180)));
